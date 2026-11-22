@@ -1,0 +1,42 @@
+# Everything the experiments read that is not in git. `sv assets fetch` materialises it,
+# `sv assets verify` checks it. Datasets and weights go to input/ (git-ignored);
+# third-party sources are snapshotted at pinned commits into third_party/ (committed).
+
+datasets:
+  cub:
+    url: https://data.caltech.edu/records/65de6-vp158/files/CUB_200_2011.tgz
+    dest: input/datasets            # extracts to input/datasets/CUB_200_2011
+    check: {dir: input/datasets/CUB_200_2011/images, files: 11788}
+  cifar100:                         # torchvision download; also the canvas source
+    torchvision: CIFAR100
+    dest: input/datasets/cifar100
+    check: {dir: input/datasets/cifar100/cifar-100-python, files: 3}
+
+weights:                            # timm checkpoints from the Hugging Face Hub
+  vit_tiny_patch16_224.augreg_in21k_ft_in1k:
+    hf_repo: timm/vit_tiny_patch16_224.augreg_in21k_ft_in1k
+    file: model.safetensors
+    dest: input/weights/vit_tiny_patch16_224.augreg_in21k_ft_in1k
+  vit_small_patch16_224.augreg_in21k_ft_in1k:   # optional scale-up (DECISIONS A2)
+    hf_repo: timm/vit_small_patch16_224.augreg_in21k_ft_in1k
+    file: model.safetensors
+    dest: input/weights/vit_small_patch16_224.augreg_in21k_ft_in1k
+
+third_party:                        # reference implementations, read-only, pinned
+  adaptivenn:
+    repo: https://github.com/LeapLabTHU/AdaptiveNN
+    commit: 020bf8d33271d7b02e2e63829e4b13d987868b89
+    license: MIT
+    role: coarse-to-fine loop, confidence stopping, self-rewarding RL (M2/M4, Stage B)
+  dynamicvit:
+    repo: https://github.com/raoyongming/DynamicViT
+    commit: 1322e626d1e9eca18cc150569908fb4af29e15f7
+    license: MIT
+    role: input-adaptive one-pass token sparsification (prior work for Q2)
+  ptopk:
+    repo: https://github.com/google-research/google-research
+    subdir: ptopk_patch_selection
+    commit: 20c6bc70bfcedc40465942e8815f3de57d1658ce
+    license: Apache-2.0
+    role: perturbed top-K patch selection (our TopK in models/glimpse.py)
+  # Not snapshotted: FocusViT and CAIT publish no code; Dynamic-Vision-Transformer has no licence.

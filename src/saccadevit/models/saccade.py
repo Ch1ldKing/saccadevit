@@ -53,7 +53,7 @@ class Rollout:
 class SaccadeViT(nn.Module):
     def __init__(self, m):
         super().__init__()
-        self.backbone = bb = Backbone(m.backbone, m.pretrained, m.num_classes)
+        self.backbone = bb = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights)
         D, self.grid = bb.dim, bb.grid
         self.coarse = CoarseLook(D, m.coarse_depth, m.num_classes)
         self.task = TaskEncoder(m.task, m.num_classes, D)

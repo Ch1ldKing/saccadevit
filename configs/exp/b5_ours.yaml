@@ -5,7 +5,7 @@ model:
   task: coarse_logits
 train:
   stage: b
-  init: runs/stage_a/seed${seed}/best.pt
+  init: output/stage_a/seed${seed}/best.pt
   epochs: 20
   lr: 3.0e-4
   joint_lr_scale: 0.1

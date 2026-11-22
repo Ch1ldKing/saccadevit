@@ -2,7 +2,7 @@
 _base_: ../b0_full.yaml
 data:
   dataset: canvas
-  root: data/cifar100
+  root: input/datasets/cifar100
   img_size: 1024
 model:
   num_classes: 100

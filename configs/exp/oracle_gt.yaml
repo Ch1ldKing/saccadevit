@@ -3,4 +3,4 @@ _base_: stage_a.yaml
 model:
   policy: gt
 eval:
-  ckpt: runs/stage_a/seed${seed}/best.pt
+  ckpt: output/stage_a/seed${seed}/best.pt

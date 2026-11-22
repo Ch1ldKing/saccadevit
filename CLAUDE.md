@@ -1,23 +1,24 @@
 # CLAUDE.md: SaccadeViT
 
-The codebase for Group 3's NeuroAI project 3. Docs live outside this repo:
-- `../DESIGN.md`: the method, the 8 fixes to the slides, and the build order. **Source of truth for *why*.** If code and DESIGN.md disagree, update DESIGN.md in the same change.
-- `../DECISIONS.md`: open decisions waiting on the group. Do not settle them silently in code; when one is ticked, apply it to the configs.
-- `../../Saccadic_ViT_Presentation_EN 1.pptx`: the slides (research questions, baselines, targets, kill criteria).
-- `../../digests/总报告.md`, `../../dives/`: literature notes, including fallback routes A1/A3/D3.
-- `README.md`: commands and the experiment table. Keep it in sync when configs are added.
+The codebase for Group 3's NeuroAI project 3. Layout follows `~/LocalProgramme/research/radar_enhance`.
+
+## Docs (keep current in the same commit as the code)
+- `docs/MODEL.md`: what the method does and its objectives per stage. **Update it whenever a loss, module or default changes.**
+- `docs/RUNBOOK.md`: setup, make targets, dependencies between runs, outputs.
+- `third_party/README.md`: pinned reference snapshots.
+- Outside the repo: `../DESIGN.md` (why), `../DECISIONS.md` (open group decisions; never settle them silently in code), `../../Saccadic_ViT_Presentation_EN 1.pptx` (RQs, targets, kill criteria), `../../digests/`, `../../dives/` (literature, fallback routes A1/A3/D3).
 
 ## Rules
-- `uv` only (`uv sync`, `uv run sv ...`, `uv run pytest -q`). Run from the repo root, since paths in configs are relative.
-- One YAML per experiment in `configs/exp/` with `_base_` inheritance. Never fork code for an experiment. Add a config key instead.
-- Baselines and ablations share one action space and one Stage-A checkpoint, which is what keeps comparisons at equal budget. Keep it that way.
-- Token reduction must use `gather` at inference, never masks. Otherwise the latency claim is invalid.
-- Minimal defensive code. Lean tests: `tests/test_modules.py` (unit), `tests/test_pipeline.py` (every stage end-to-end on fake CUB, CPU, ~10 s).
-- Platform: one L40 48 GB. Latency is reported at batch 1, p50/p95, on both GPU and CPU.
+- `uv` and the underscore Makefile targets only. Every experiment is a make target that calls `sv`. Run from the repo root.
+- `input/` (datasets, weights, `MANIFEST.json`) and `output/` (runs) are git-ignored except `.gitkeep`. Everything in `input/` comes from `configs/assets.yaml` via `make setup`. No hub or internet access at train time (`model.weights` is a local file).
+- `third_party/` is committed, pinned and read-only. It is never imported; `src/` reimplements. Re-snapshot only through `make third_party_fetch`.
+- One YAML per experiment in `configs/exp/` with `_base_` inheritance. Add a config key instead of forking code. Run `make validate_configurations` after touching configs (it checks that every `init`/`ckpt` link points at a registered experiment).
+- Baselines and ablations share one action space and one Stage-A checkpoint (equal budget). Inference token reduction uses `gather`, never masks.
+- Minimal defensive code. Lean tests: `tests/test_modules.py`, `tests/test_pipeline.py` (all stages on fake CUB, CPU, ~10 s).
+- Platform: one L40 48 GB. Latency at batch 1, p50/p95, GPU and CPU. Do not fetch CUB inside the Obsidian vault copy.
 
 ## Decisions made in code (beyond DESIGN.md)
-- `q` defaults to `coarse_logits` (embedding of the coarse class belief). Attribute queries are not built yet.
-- A4 = `k_max: 0` (coarse pass only). B3 = one whole-image look (scale index `len(scales)`). Stage A's teacher mixes gt / random / full view, so B3 is in-distribution.
-- Patch translator = light stride-16 conv over the crop, not per-patch ResNet-18 windows.
-- τ is applied post hoc in batched eval (`stop_index`). `SaccadeViT.infer` stops for real. Both follow the same rule.
-- Cost check (random weights, 448² input): B0 2.51 GFLOPs; ours with 2 looks at ρ=0.15 is 1.33 (1.9×), and with 3 looks 1.77.
+- `q` = `coarse_logits`. A4 = `k_max: 0`. B3 = one whole-image look (scale index `len(scales)`), kept in-distribution by Stage A's teacher mix.
+- Light stride-16 translator. τ applied post hoc in batched eval, with the same rule as `SaccadeViT.infer`.
+- λ (`train.cost_weight`) is inert under fixed-K rollouts (the baseline cancels it). See MODEL.md §3.
+- Cost check (448² input): B0 2.51 GFLOPs; ours with 2 looks at ρ=0.15 is 1.33, with 3 looks 1.77.

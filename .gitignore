@@ -1,8 +1,11 @@
+# Large inputs and generated outputs stay local; keep the two directories.
+/input/*
+!/input/.gitkeep
+/output/*
+!/output/.gitkeep
+
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
-runs/
-data/
-*.pt
 .DS_Store

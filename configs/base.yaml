@@ -1,11 +1,11 @@
 # Shared defaults. Every experiment in configs/exp/ inherits this via `_base_`.
 # Run name = path under configs/exp ("canvas/b0_full.yaml" -> "canvas-b0_full").
 seed: 0
-out_dir: runs/${name}/seed${seed}
+out_dir: output/${name}/seed${seed}
 
 data:
   dataset: cub            # cub | canvas | cifar100
-  root: data/CUB_200_2011
+  root: input/datasets/CUB_200_2011
   img_size: 448
   val_frac: 0.1           # carved from the official train split, fixed seed
   batch_size: 64
@@ -15,6 +15,7 @@ model:
   kind: saccade           # full (B0) | merge (B4) | saccade
   backbone: vit_tiny_patch16_224.augreg_in21k_ft_in1k   # ~5.7M params (DESIGN.md fix #1)
   pretrained: true
+  weights: input/weights/${model.backbone}/model.safetensors   # fetched by `make setup`
   num_classes: 200
   img_size: ${data.img_size}
   coarse_depth: 2         # M1: blocks used by the coarse look

@@ -1,10 +1,10 @@
 _base_: ../stage_a.yaml
 data:
   dataset: canvas
-  root: data/cifar100
+  root: input/datasets/cifar100
   img_size: 1024
 model:
   num_classes: 100
   scales: [128, 192, 256]
 train:
-  init: runs/canvas-b0_full/seed${seed}/best.pt
+  init: output/canvas-b0_full/seed${seed}/best.pt

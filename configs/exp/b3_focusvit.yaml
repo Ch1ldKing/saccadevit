@@ -5,4 +5,4 @@ model:
   k_max: 1
   keep_ratio: 0.3
 eval:
-  ckpt: runs/stage_a/seed${seed}/best.pt
+  ckpt: output/stage_a/seed${seed}/best.pt

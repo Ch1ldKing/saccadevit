@@ -17,9 +17,10 @@ def to_vit_res(img: torch.Tensor) -> torch.Tensor:
 class Backbone(nn.Module):
     """Exposes patchify / encode so callers control which tokens enter the blocks."""
 
-    def __init__(self, name: str, pretrained: bool, num_classes: int):
+    def __init__(self, name: str, pretrained: bool, num_classes: int, weights: str | None = None):
         super().__init__()
-        self.vit = timm.create_model(name, pretrained=pretrained, num_classes=num_classes)
+        overlay = {"file": weights} if pretrained else None  # local file from input/weights, no hub access
+        self.vit = timm.create_model(name, pretrained=pretrained, num_classes=num_classes, pretrained_cfg_overlay=overlay)
         self.dim = self.vit.embed_dim
         self.grid = self.vit.patch_embed.grid_size[0]
         self.num_patches = self.grid**2
@@ -53,7 +54,7 @@ class FullViT(nn.Module):
 
     def __init__(self, m):
         super().__init__()
-        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes)
+        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights)
 
     def forward(self, img):
         return self.backbone.vit(to_vit_res(img))

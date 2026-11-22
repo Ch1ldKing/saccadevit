@@ -1,0 +1,4 @@
+repo: https://github.com/google-research/google-research
+commit: 20c6bc70bfcedc40465942e8815f3de57d1658ce
+subdir: ptopk_patch_selection
+license: Apache-2.0

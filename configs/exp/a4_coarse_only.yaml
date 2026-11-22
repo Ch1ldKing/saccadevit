@@ -3,4 +3,4 @@ _base_: b5_ours.yaml
 model:
   k_max: 0
 eval:
-  ckpt: runs/b5_ours/seed${seed}/best.pt
+  ckpt: output/b5_ours/seed${seed}/best.pt

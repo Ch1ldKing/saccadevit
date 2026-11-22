@@ -1,4 +1,4 @@
-"""sv train|eval|sweep|latency CONFIG [key=value ...];  sv compare GLOB_A GLOB_B [--k K | --tau T]"""
+"""sv train|eval|sweep|latency CONFIG [key=value ...]; sv compare A B; sv assets fetch|verify; sv validate"""
 
 import argparse
 
@@ -17,14 +17,32 @@ def main() -> None:
     c = sub.add_parser("compare", help="paired bootstrap B - A over eval_*.npz files (one per seed)")
     c.add_argument("a")
     c.add_argument("b")
-    c.add_argument("--k", type=int)
-    c.add_argument("--tau", type=float)
+    c.add_argument("--rule", default="last", help="'last' | 'k=2' | 'tau=0.4', for both sides")
+    c.add_argument("--rule-a", help="override for A")
+    c.add_argument("--rule-b", help="override for B")
+    a = sub.add_parser("assets", help="fetch / verify input/ and third_party/ (configs/assets.yaml)")
+    a.add_argument("action", choices=["fetch", "verify"])
+    a.add_argument("--only", nargs="*", help="asset names or groups (datasets, weights, third_party)")
+    sub.add_parser("validate", help="load every experiment config and build its model")
     args = p.parse_args()
 
+    if args.cmd == "assets":
+        from . import assets
+
+        if args.action == "fetch":
+            assets.fetch(args.only)
+        else:
+            raise SystemExit(0 if assets.verify() else 1)
+        return
+    if args.cmd == "validate":
+        from .validate import validate_all
+
+        validate_all()
+        return
     if args.cmd == "compare":
         from .engine.stats import compare
 
-        compare(args.a, args.b, args.k, args.tau)
+        compare(args.a, args.b, args.rule_a or args.rule, args.rule_b or args.rule)
         return
     cfg = load_config(args.config, args.overrides)
     if args.cmd == "train":

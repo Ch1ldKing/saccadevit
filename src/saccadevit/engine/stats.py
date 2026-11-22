@@ -10,14 +10,16 @@ import torch
 from ..models.aggregator import stop_index
 
 
-def _correct(path: str, k: int | None, tau: float | None) -> tuple[np.ndarray, dict]:
+def _correct(path: str, rule: str) -> tuple[np.ndarray, dict]:
+    """rule: 'last' | 'k=<looks>' (fixed number of looks) | 'tau=<threshold>' (entropy stop)."""
     r = dict(np.load(path))
     c = r["correct"]
-    if tau is not None:
-        looks = stop_index(torch.from_numpy(r["entropy"]), tau).numpy()
+    kind, _, value = rule.partition("=")
+    if kind == "tau":
+        looks = stop_index(torch.from_numpy(r["entropy"]), float(value)).numpy()
         vec = c[looks, np.arange(c.shape[1])]
     else:
-        vec = c[-1 if k is None else k]
+        vec = c[int(value) if kind == "k" else -1]
     return vec.astype(float), r
 
 
@@ -30,13 +32,13 @@ def paired_bootstrap(a: np.ndarray, b: np.ndarray, n: int = 10_000, seed: int = 
             "p_le_0": float((boots <= 0).mean()), "n": int(len(diff))}
 
 
-def compare(glob_a: str, glob_b: str, k=None, tau=None) -> dict:
+def compare(glob_a: str, glob_b: str, rule_a: str = "last", rule_b: str = "last") -> dict:
     pa, pb = sorted(glob.glob(glob_a)), sorted(glob.glob(glob_b))
     assert len(pa) == len(pb) > 0, (pa, pb)
     A, B, ref = [], [], None
     for x, y in zip(pa, pb):
-        ca, ra = _correct(x, k, tau)
-        cb, _ = _correct(y, k, tau)
+        ca, ra = _correct(x, rule_a)
+        cb, _ = _correct(y, rule_b)
         A.append(ca)
         B.append(cb)
         ref = ra if ref is None else ref
@@ -46,7 +48,7 @@ def compare(glob_a: str, glob_b: str, k=None, tau=None) -> dict:
     strata |= {"coarse_right": coarse_ok, "coarse_wrong": ~coarse_ok}
     q1, q2 = np.quantile(ref["area"], [1 / 3, 2 / 3])
     strata |= {"small": ref["area"] <= q1, "medium": (ref["area"] > q1) & (ref["area"] <= q2), "large": ref["area"] > q2}
-    res = {"a": pa, "b": pb, "acc_a": float(A.mean()), "acc_b": float(B.mean())}
+    res = {"a": pa, "b": pb, "rule_a": rule_a, "rule_b": rule_b, "acc_a": float(A.mean()), "acc_b": float(B.mean())}
     res |= {name: paired_bootstrap(A[:, m], B[:, m]) for name, m in strata.items() if m.any()}
     print(json.dumps(res, indent=2))
     return res

@@ -1,0 +1,4 @@
+repo: https://github.com/raoyongming/DynamicViT
+commit: 1322e626d1e9eca18cc150569908fb4af29e15f7
+subdir: .
+license: MIT

@@ -3,6 +3,6 @@ _base_: b0_full.yaml
 model:
   kind: merge
 train:
-  init: runs/b0_full/seed${seed}/best.pt
+  init: output/b0_full/seed${seed}/best.pt
   epochs: 30
   lr: 1.0e-4

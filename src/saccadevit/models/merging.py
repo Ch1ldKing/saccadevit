@@ -36,7 +36,7 @@ class NeighbourMerge(nn.Module):
 class MergeViT(nn.Module):
     def __init__(self, m):
         super().__init__()
-        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes)
+        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights)
         D = self.backbone.dim
         self.merge_at = list(m.merge_at)
         self.merges = nn.ModuleList([NeighbourMerge(D, "w"), NeighbourMerge(D, "h")])

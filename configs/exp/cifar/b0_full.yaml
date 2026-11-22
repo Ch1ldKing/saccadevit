@@ -2,7 +2,7 @@
 _base_: ../b0_full.yaml
 data:
   dataset: cifar100
-  root: data/cifar100
+  root: input/datasets/cifar100
   img_size: 224
   batch_size: 128
 model:

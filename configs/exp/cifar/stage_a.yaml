@@ -1,12 +1,12 @@
 _base_: ../stage_a.yaml
 data:
   dataset: cifar100
-  root: data/cifar100
+  root: input/datasets/cifar100
   img_size: 224
   batch_size: 128
 model:
   num_classes: 100
   scales: [64, 112, 160]
 train:
-  init: runs/cifar-b0_full/seed${seed}/best.pt
+  init: output/cifar-b0_full/seed${seed}/best.pt
   epochs: 20

@@ -5,6 +5,6 @@ model:
   policy: random          # val selection uses random looks (= B1 protocol)
 train:
   stage: a
-  init: runs/b0_full/seed${seed}/best.pt
+  init: output/b0_full/seed${seed}/best.pt
   epochs: 40
   lr: 1.0e-3

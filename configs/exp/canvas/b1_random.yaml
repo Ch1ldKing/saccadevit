@@ -1,3 +1,3 @@
 _base_: stage_a.yaml
 eval:
-  ckpt: runs/canvas-stage_a/seed${seed}/best.pt
+  ckpt: output/canvas-stage_a/seed${seed}/best.pt
