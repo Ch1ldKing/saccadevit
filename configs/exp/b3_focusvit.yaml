@@ -1,8 +1,8 @@
-# B3: FocusViT-style static selection: one look at the whole image, fixed keep ratio.
-_base_: stage_a.yaml
+# B3: FocusViT-style static selection: one look at the whole image, learned top-K keeping 30%.
+_base_: a6_topk_stage_a.yaml
 model:
   policy: center
   k_max: 1
   keep_ratio: 0.3
 eval:
-  ckpt: output/stage_a/seed${seed}/best.pt
+  ckpt: output/a6_topk_stage_a/seed${seed}/best.pt

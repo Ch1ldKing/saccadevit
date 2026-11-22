@@ -21,7 +21,7 @@ model:
   coarse_depth: 2         # M1: blocks used by the coarse look
   task: coarse_logits     # q: coarse_logits | none (A5)
   policy: learned         # learned | random | saliency | center | gt | mix
-  scales: [112, 160, 224] # crop sides in px at img_size; index len(scales) = whole image
+  scales: [80, 112, 160, 224]  # crop sides in px at img_size; index len(scales) = whole image
   saliency_scale: 1
   mix_probs: [0.4, 0.4, 0.2]   # Stage-A teacher: gt / random / full view
   keep_ratio: 0.15        # default rho per look: 29 tokens; 2 looks = 30% of B0 (DESIGN.md fix #5)
@@ -29,7 +29,7 @@ model:
   offset_pe: true         # A1 switches this off
   topk_sigma: 0.05
   topk_samples: 16
-  select: topk            # topk (learned scorer) | grid (even subset) | resize (whole crop at g x g patches)
+  select: resize          # resize (whole crop at g x g patches, g = round(sqrt(rho*196))) | topk (learned scorer, A6) | grid
   select_distill: false   # supervise the token scorer with the backbone's CLS attention (train only)
   fuse_rest: false        # EViT: one extra token = score-weighted mean of the dropped tokens
   k_max: 3
@@ -45,7 +45,7 @@ train:
   grad_clip: 1.0
   label_smoothing: 0.1
   amp: true               # bf16 autocast on CUDA
-  tune_last_blocks: 2
+  tune_last_blocks: 10    # blocks 3-12; the coarse look's blocks 1-2 stay frozen
   backbone_lr_scale: 0.1
   joint_lr_scale: 0.0     # stage b: lr scale for M1/M3/M4 (0 = frozen)
   keep_ratio_range: [0.1, 1.0]

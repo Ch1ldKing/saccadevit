@@ -1,0 +1,5 @@
+# A6: Stage A with FocusViT-style learned top-K token selection instead of resize glimpses.
+# Also the checkpoint behind B3. (Diagnostics: the scorer selects no better than random; see EXPERIMENT_LOG.)
+_base_: stage_a.yaml
+model:
+  select: topk

@@ -51,4 +51,25 @@ Probe of d2 (val, 1 look unless stated):
 | gt | 71.3 | 59.8 / 61.4 | 50.3 / 52.8 | 36.2 / 33.2 |
 | gt, 3 looks | 71.6 | 63.3 / 67.3 | 54.3 / 56.9 | 39.7 / 37.7 |
 
-So backbone tuning is the main lever, but the scorer is still no better than random. Next: supervise the scorer with the backbone's own CLS attention (`model.select_distill`) and fold the dropped tokens into one EViT rest token (`model.fuse_rest`). Variants e1–e3 are running.
+So backbone tuning is the main lever, but the scorer is still no better than random.
+
+### Scorer supervision and rest token (8 epochs, on top of d2; probe at ρ=0.15, scorer / random-K)
+
+| Variant | Best val % | center, 1 look | gt, 1 look | gt, 3 looks |
+|---|---|---|---|---|
+| e1: CLS-attention distillation | 14.7 | 18.9 / 19.2 | 27.2 / 30.4 | 31.7 / 38.9 |
+| e2: fused rest token | 20.0 | 24.4 / 24.9 | 31.6 / 37.4 | 34.9 / **46.6** |
+| e3: both | 11.7 | 9.0 / 17.9 | 16.9 / 33.7 | 21.0 / 37.7 |
+
+**Finding 3.** Importance-based selection loses to random subsets in every variant, and teacher attention makes it worse. A sparse ViT input needs **coverage**: top-K clusters on salient, redundant patches. The rest token helps by about 5–8 points.
+
+### Coverage-preserving glimpses (8 epochs, on top of d2)
+
+| Variant | Best val % | center ρ=.15 | gt 1 look ρ=.3 | gt 1 look ρ=.15 | gt 3 looks ρ=.15 | random 3 looks ρ=.15 |
+|---|---|---|---|---|---|---|
+| d2 learned top-K | 24.9 | 29.5 | 50.3 | 36.2 | 39.7 | 23.9 |
+| f1 grid + rest token | 28.4 | 35.9 | 64.9 | 39.2 | 49.9 | 26.2 |
+| **f2 resize** (crop at g×g, all tokens) | **39.6** | 31.2 | **71.0** | **54.1** | **61.3** | **36.4** |
+
+**Decision (2026-11-23).** The default glimpse becomes `select: resize` with blocks 3–12 tuned, and crop scales {80, 112, 160, 224}. This is a foveal glimpse: a budget of g² tokens covers the whole crop, and zoom is the policy's scale choice. FocusViT-style learned top-K becomes ablation **A6** (`a6_topk_stage_a`), and B3 evaluates that checkpoint so B3 stays faithful to FocusViT. The v0 runs are archived in `output/_v0/`. B0 and canvas B0 are unaffected and kept.
+

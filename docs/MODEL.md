@@ -8,7 +8,7 @@ This file is the reference description of the method as implemented. Every symbo
 
 ```text
 input   x ∈ R^{3×S×S}              S = 448 (CUB), 512 (canvas), 224 (CIFAR)
-knobs   ρ ∈ (0,1]   tokens kept per look          model.keep_ratio  (default 0.15 → 29 of 196)
+knobs   ρ ∈ (0,1]   token budget per look          model.keep_ratio  (default 0.15 → g=5, 25 tokens)
         K           maximum number of looks       model.k_max       (default 3)
         τ ∈ [0,1]   stop when normalised entropy < τ   eval.tau     (0 = never stop early)
 output  p(y|x)      class distribution
@@ -27,12 +27,11 @@ M1 coarse    C = f_{1..2}(patch16(resize_224(x)))      C ∈ R^{N×D}, field of 
 for t = 1..K:
   stop if  H(p_{t-1}) / log|Y| < τ                     (checked for t-1 = 0 too: zero looks is allowed)
   M2 aim     a_t = (cell, scale) ~ π_φ(· | C, g, e_{t-1}, q)
-             cells ∈ 14×14 coarse grid (visited cells masked), scales ∈ {112,160,224} px
-  M3 look    crop_t = roi_align(x, box(a_t)) → 224²
+             cells ∈ 14×14 coarse grid (visited cells masked), scales ∈ {80,112,160,224} px
+  M3 look    g = round(√(ρN));  crop_t = roi_align(x, box(a_t)) → (16g)²   (resize glimpse)
              crop_t ← shift each patch by (dx,dy) = 0.5·tanh(T(crop_t))   (patch translator)
-             u_i = patch16(crop_t)_i + pe_i + MLP_off(dx_i,dy_i) + MLP_loc(abs_xy_i, side)
-             keep the top ⌈ρN⌉ tokens by score s_i = w·LN(u_i)   (hard top-K + gather)
-             z_t = LN(f_{1..12}([cls; kept]))_cls
+             u_i = patch16(crop_t)_i + interp_g(pe)_i + MLP_off(dx_i,dy_i) + MLP_loc(abs_xy_i, side)
+             z_t = LN(f_{1..12}([cls; u_1..u_{g²}]))_cls                  (all g² tokens, no selection)
   M4 accum   e_t = GRU(e_{t-1}, z_t);   p_t = softmax(W_h LN(e_t))
 return p_t, t
 ```
@@ -41,7 +40,7 @@ return p_t, t
 |---|---|---|
 | Coarse look with pretrained patch embedding at 448→224 | `models/coarse.py` | Choi 2022, DESIGN fix #3 |
 | Policy over coarse cells × scales; inhibition of return | `models/policy.py` | **ours (addition 1)** |
-| Translate, then re-embed, then top-K | `models/glimpse.py` | FocusViT; light translator (fix #7) |
+| Resize glimpse (whole crop at g×g patches), translate, re-embed | `models/glimpse.py` | FocusViT translation + offset PE. **Resize replaces top-K** (EXPERIMENT_LOG findings 1–3); top-K is kept as A6/B3 |
 | GRU accumulation + entropy stop | `models/aggregator.py` | **ours (addition 2)**, after AdaptiveNN |
 
 **Cost model** (`engine/evaluate.py: at_tau`), in token-blocks relative to B0:
@@ -50,7 +49,7 @@ $$
 \mathrm{cost}(x) = \frac{d_c N + \mathrm{looks}(x)\, d\, \lceil \rho N \rceil}{d N}, \qquad d_c = 2,\ d = 12
 $$
 
-Measured GFLOPs at 448² input: B0 = 2.51. Ours = 1.33 with 2 looks at ρ = 0.15, and 1.77 with 3. The claim itself is judged on batch-1 p50/p95 milliseconds (`engine/latency.py`), not on this proxy.
+Measured GFLOPs at 448² input (top-K version, 29 tokens per look): B0 = 2.51; 1.33 with 2 looks, 1.77 with 3. The resize glimpse at ρ = 0.15 feeds 25 tokens, slightly fewer. The claim itself is judged on batch-1 p50/p95 milliseconds (`engine/latency.py`), not on this proxy.
 
 ## 2. The problem being solved
 
@@ -82,11 +81,11 @@ $$
 \mathcal L_A = \frac{1}{k}\sum_{t=1}^{k} \mathrm{CE}_\epsilon(p_t, y) \;+\; w_c\, \mathrm{CE}_\epsilon(p_0, y), \qquad w_c = 0.5
 $$
 
-- **Trained:** coarse head (W_c, LN), translator T, MLP_off, MLP_loc, scorer w, GRU and head, and the last 2 ViT blocks at 0.1× learning rate.
-- **Frozen:** blocks 1–10, including the coarse blocks 1–2, and the policy π_φ.
+- **Trained:** coarse head (W_c, LN), translator T, MLP_off, MLP_loc, GRU and head, and ViT blocks 3–12 at 0.1× learning rate (`train.tune_last_blocks: 10`).
+- **Frozen:** the coarse blocks 1–2 (so the context map C stays fixed) and the policy π_φ.
 - **Why randomise k and ρ:** so that one set of M3/M4 weights is valid for every budget swept later (fix #6).
 
-**How top-K stays differentiable.** For z-scored scores $\tilde s$, the training forward pass returns the averaged indicator over S = 16 noise draws (σ = 0.05):
+**A6 only: how top-K stays differentiable.** For z-scored scores $\tilde s$, the training forward pass returns the averaged indicator over S = 16 noise draws (σ = 0.05):
 
 $$
 Y = \mathbb E_Z\big[\mathbf 1_{\mathrm{topk}}(\tilde s + \sigma Z)\big] \in \mathbb R^{k\times N}, \qquad \text{kept} = Y u
@@ -111,7 +110,7 @@ $$
 
 - **Advantage:** $\hat A_t$ = $G_t$ normalised across the batch at each step (mean as baseline, divided by the standard deviation).
 - **Weights:** $\beta = 0.01$, $w_{ce} = 1$.
-- **What moves:** π_φ at the full learning rate. M1 head, W_q, M3 and M4 at 0.1× (`train.joint_lr_scale`), and the last 2 blocks at 0.01×, so they adapt to the policy's fixation distribution.
+- **What moves:** π_φ at the full learning rate. M1 head, W_q, M3 and M4 at 0.1× (`train.joint_lr_scale`), and blocks 3–12 at 0.01×, so they adapt to the policy's fixation distribution.
 - **Policy inputs are detached:** the policy gradient never reaches the backbone.
 - **λ is currently inactive.** Every sample takes the same K looks at the same ρ, so the cost term is the same constant for the whole batch, and the per-step baseline cancels it. λ only matters once rollout length varies (a learned stop action). That is why it defaults to 0 and the stopping decision is made by τ instead.
 
@@ -139,5 +138,5 @@ $$
 
 - **When to stop** is a calibrated rule (τ), not learned. λ stays inert until a stop action exists.
 - **The coarse blocks** f₁..₂ stay frozen after Stage 0, so the context map C is fixed.
-- **The translator and scorer** are trained only through classification loss. There is no gaze or saliency supervision.
+- **The translator** (and the A6 scorer) are trained only through classification loss. There is no gaze or saliency supervision.
 - **The policy** never sees the label. The label enters only through the reward.

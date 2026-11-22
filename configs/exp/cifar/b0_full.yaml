@@ -7,6 +7,6 @@ data:
   batch_size: 128
 model:
   num_classes: 100
-  scales: [64, 112, 160]
+  scales: [48, 64, 112, 160]
 train:
   epochs: 20

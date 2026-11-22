@@ -44,7 +44,7 @@ test: ## lean test suite on fake CUB (CPU)
 	$(UV) run pytest -q
 
 # ---------------------------------------------------------------- CUB-200-2011 (main)
-.PHONY: train_b0_full train_stage_a train_b4_merge train_b5_ours train_a5_no_task train_a1_no_offset_stage_a train_a1_no_offset
+.PHONY: train_a6_topk_stage_a train_b0_full train_stage_a train_b4_merge train_b5_ours train_a5_no_task train_a1_no_offset_stage_a train_a1_no_offset
 train_b0_full: ## B0 / stage 0: full image, all 196 tokens (gate M1)
 	$(SV) train $(E)/b0_full.yaml seed=$(SEED) $(ARGS)
 train_stage_a: ## stage A: M3 + M4 on teacher fixations (needs b0_full)
@@ -59,8 +59,10 @@ train_a1_no_offset_stage_a: ## A1 part 1: stage A without offset PE (needs b0_fu
 	$(SV) train $(E)/a1_no_offset_stage_a.yaml seed=$(SEED) $(ARGS)
 train_a1_no_offset: ## A1 part 2: stage B on the no-offset stage A
 	$(SV) train $(E)/a1_no_offset.yaml seed=$(SEED) $(ARGS)
+train_a6_topk_stage_a: ## A6: stage A with learned top-K instead of resize glimpses (also B3's checkpoint)
+	$(SV) train $(E)/a6_topk_stage_a.yaml seed=$(SEED) $(ARGS)
 
-CUB_EVALS := b0_full b4_merge b1_random b2_saliency b3_focusvit oracle_gt b5_ours a1_no_offset a2_fixed_k a4_coarse_only a5_no_task
+CUB_EVALS := b0_full b4_merge a6_topk_stage_a b1_random b2_saliency b3_focusvit oracle_gt b5_ours a1_no_offset a2_fixed_k a4_coarse_only a5_no_task
 .PHONY: $(addprefix evaluate_,$(CUB_EVALS)) sweep_a3_keep_sweep
 $(addprefix evaluate_,$(CUB_EVALS)): evaluate_%: ## test-set eval -> output/<exp>/seed<k>/summary_test.json
 	$(SV) eval $(E)/$*.yaml seed=$(SEED) $(ARGS)
@@ -114,13 +116,13 @@ evaluate_cifar_all: ## CIFAR-100 control B0, B5
 canvas: train_canvas_b0_full train_canvas_stage_a train_canvas_b5_ours evaluate_canvas_all ## canvas end to end for SEED
 
 preliminary: ## seed-0 first results: M1, M2, B1-B3/oracle, B5, latency
-	$(MAKE) train_b0_full train_stage_a SEED=0
+	$(MAKE) train_b0_full train_stage_a train_a6_topk_stage_a SEED=0
 	$(MAKE) evaluate_b0_full evaluate_b1_random evaluate_b2_saliency evaluate_b3_focusvit evaluate_oracle_gt SEED=0
 	$(MAKE) train_b5_ours evaluate_b5_ours sweep_a3_keep_sweep SEED=0
 	$(MAKE) latency_gpu_b0_full latency_gpu_b5_ours latency_cpu_b0_full latency_cpu_b5_ours SEED=0
 
 cub: ## the whole CUB matrix for SEED
-	$(MAKE) train_b0_full train_stage_a train_b4_merge train_b5_ours train_a5_no_task train_a1_no_offset_stage_a train_a1_no_offset SEED=$(SEED)
+	$(MAKE) train_b0_full train_stage_a train_a6_topk_stage_a train_b5_ours train_a5_no_task train_a1_no_offset_stage_a train_a1_no_offset train_b4_merge SEED=$(SEED)
 	$(MAKE) evaluate_cub_all sweep_a3_keep_sweep SEED=$(SEED)
 
 cub_3_seeds: ## CUB matrix for seeds 0 1 2, then latency and H1/H2 comparisons

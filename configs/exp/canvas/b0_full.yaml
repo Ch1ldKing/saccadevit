@@ -6,6 +6,6 @@ data:
   img_size: 512
 model:
   num_classes: 100
-  scales: [64, 96, 128]
+  scales: [48, 64, 96, 128]
 train:
   epochs: 20
