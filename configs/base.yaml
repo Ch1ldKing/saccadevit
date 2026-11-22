@@ -29,6 +29,7 @@ model:
   offset_pe: true         # A1 switches this off
   topk_sigma: 0.05
   topk_samples: 16
+  select: topk            # topk (learned scorer) | grid (even subset) | resize (whole crop at g x g patches)
   select_distill: false   # supervise the token scorer with the backbone's CLS attention (train only)
   fuse_rest: false        # EViT: one extra token = score-weighted mean of the dropped tokens
   k_max: 3

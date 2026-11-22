@@ -21,6 +21,7 @@ class Backbone(nn.Module):
         super().__init__()
         overlay = {"file": weights} if pretrained else None  # local file from input/weights, no hub access
         self.vit = timm.create_model(name, pretrained=pretrained, num_classes=num_classes, pretrained_cfg_overlay=overlay)
+        self.vit.patch_embed.strict_img_size = False  # resize glimpses feed g x g patch grids
         self.dim = self.vit.embed_dim
         self.grid = self.vit.patch_embed.grid_size[0]
         self.num_patches = self.grid**2

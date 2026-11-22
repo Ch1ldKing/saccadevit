@@ -60,7 +60,7 @@ class SaccadeViT(nn.Module):
         self.coarse = CoarseLook(D, m.coarse_depth, m.num_classes)
         self.task = TaskEncoder(m.task, m.num_classes, D)
         self.policy = LearnedPolicy(D, len(m.scales))
-        self.glimpse = Glimpse(D, self.grid, m.translate, m.offset_pe, m.topk_sigma, m.topk_samples, m.select_distill, m.fuse_rest)
+        self.glimpse = Glimpse(D, self.grid, m.translate, m.offset_pe, m.topk_sigma, m.topk_samples, m.select_distill, m.fuse_rest, m.select)
         self.agg = Aggregator(D, m.num_classes)
         self.img_size = m.img_size
         self.num_scales = len(m.scales)
