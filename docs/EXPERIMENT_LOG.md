@@ -150,3 +150,19 @@ Test %, mean ± std over seeds 0–2, 25 tokens per look. Full table: [CURRENT_R
 **H3 sweep** is stable across seeds: at ρ = 0.15 / 0.25 / 0.5, test 66.4 / 74.9 / 79.7% at 0.46–0.53 / 0.69–0.90 / 1.2–1.7× B0 token-blocks. τ* ranges over 0.1–0.3 per seed. B0 is reached only above ~1.2× B0 cost.
 
 **Canvas (seed 0)**, test %, 3 looks: random 6.5, saliency 15.5, **B5 48.4**, B0 34.5. Here the learned policy beats the full image by 14 points with 75 tokens, because the 32–56 px target becomes tiny at 224².
+
+## 2026-11-23: CIFAR-100 control and final latency
+
+**CIFAR-100 (224², seed 0, test %):** B0 86.2. B5: 1 / 2 / 3 looks give 71.8 / 74.8 / 76.3; the coarse pass alone gives 36.7. With the object filling the frame there is nothing to find, so looking costs ~10 points: the control behaves as expected.
+
+**Latency, batch 1, RTX 3090** (measured after all training had finished; the CPU numbers are therefore cleaner than the seed-0 ones):
+
+| Model | GFLOPs | GPU p50 ms | CPU p50 ms |
+|---|---|---|---|
+| B0 | 2.51 | 4.19 | 20.6 |
+| B4 merge | 1.41 | 4.79 | **12.0** |
+| B3 FocusViT-style, 1 look | 1.23 | 7.64 | 25.8 |
+| B5, K = 3 | 1.38 | – | 34.0 |
+| B5, τ = 0.2 (2.64 looks) | 1.21 | 23.75 | – |
+
+K2 still fires: ours is 5.7× slower on GPU and 1.6× slower on CPU, while B4 (the CAIT-style merge) is 1.7× *faster* on CPU. On GPU, the ViT part alone takes 11.2 ms for 2.6 small looks, and the policy takes 3.2 ms.
