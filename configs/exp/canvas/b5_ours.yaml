@@ -4,6 +4,6 @@ model:
 train:
   stage: b
   init: output/canvas-stage_a/seed${seed}/best.pt
-  epochs: 20
+  epochs: 10
   lr: 3.0e-4
   joint_lr_scale: 0.1

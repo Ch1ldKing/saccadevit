@@ -7,7 +7,7 @@ This file is the reference description of the method as implemented. Every symbo
 **Contract.** One classifier with three inference-time budget knobs:
 
 ```text
-input   x ∈ R^{3×S×S}              S = 448 (CUB), 1024 (canvas), 224 (CIFAR)
+input   x ∈ R^{3×S×S}              S = 448 (CUB), 512 (canvas), 224 (CIFAR)
 knobs   ρ ∈ (0,1]   tokens kept per look          model.keep_ratio  (default 0.15 → 29 of 196)
         K           maximum number of looks       model.k_max       (default 3)
         τ ∈ [0,1]   stop when normalised entropy < τ   eval.tau     (0 = never stop early)

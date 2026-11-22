@@ -28,7 +28,7 @@ Makefile                 every experiment as an underscore target
 configs/base.yaml        shared defaults;  configs/exp/**.yaml  one file per experiment (_base_ inheritance)
 configs/assets.yaml      datasets, weights, third-party commits
 src/saccadevit/
-  data/                  cub (boxes, 15 parts), canvas (synthetic 1024² search), cifar (control)
+  data/                  cub (boxes, 15 parts), canvas (synthetic 512² search), cifar (control)
   models/                backbone (shared ViT, B0) · coarse (M1) · policy (M2) · glimpse (M3)
                          · aggregator (M4) · saccade (the loop) · merging (B4)
   engine/                losses · train · evaluate · sweep · latency · stats

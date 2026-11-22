@@ -1,9 +1,11 @@
-# Second task: synthetic 1024^2 search canvas (appendix B4). B0 sees it resized to 224^2.
+# Second task: synthetic 512^2 search canvas (appendix B4). B0 sees it resized to 224^2.
 _base_: ../b0_full.yaml
 data:
   dataset: canvas
   root: input/datasets/cifar100
-  img_size: 1024
+  img_size: 512
 model:
   num_classes: 100
-  scales: [128, 192, 256]
+  scales: [64, 96, 128]
+train:
+  epochs: 20

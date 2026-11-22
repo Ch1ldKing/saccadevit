@@ -21,4 +21,5 @@ The codebase for Group 3's NeuroAI project 3. Layout follows `~/LocalProgramme/r
 - `q` = `coarse_logits`. A4 = `k_max: 0`. B3 = one whole-image look (scale index `len(scales)`), kept in-distribution by Stage A's teacher mix.
 - Light stride-16 translator. τ applied post hoc in batched eval, with the same rule as `SaccadeViT.infer`.
 - λ (`train.cost_weight`) is inert under fixed-K rollouts (the baseline cancels it). See MODEL.md §3.
+- Canvas is 512² (targets 32–56 px), not the slide's 1024²: CIFAR is natively 32 px, so 1024 only upsampled the same pixels and made data loading ~8× slower. Coarse-view geometry is unchanged. 20/20/10 epochs, since the data is fresh each epoch.
 - Cost check (448² input): B0 2.51 GFLOPs; ours with 2 looks at ρ=0.15 is 1.33, with 3 looks 1.77.

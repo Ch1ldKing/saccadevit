@@ -1,8 +1,11 @@
 """Synthetic search canvas: one small CIFAR-100 object on a large cluttered canvas.
 
+Objects are 1/16-7/64 of the canvas side (32-56 px at 512^2): CIFAR is natively 32 px, so a
+larger canvas only upsamples the same pixels. The coarse 224^2 view sees the target at ~14-24 px.
+
 Clutter = block-shuffled crops of other CIFAR images (natural statistics, no class identity)
-over low-frequency noise. At the coarse 224^2 view the target is only ~15-25 px wide, so
-classification needs a look. Val/test canvases are deterministic per index; train is fresh.
+over low-frequency noise, so classification needs a look. Val/test canvases are deterministic
+per index; train canvases are fresh every epoch.
 """
 
 import numpy as np
@@ -22,10 +25,9 @@ def _shuffle_blocks(img: torch.Tensor, block: int, rng) -> torch.Tensor:
 
 
 class Canvas(Dataset):
-    def __init__(self, root, split: str, size: int, mean, std, val_frac: float = 0.1,
-                 target_px=(64, 112), distractors: int = 8):
+    def __init__(self, root, split: str, size: int, mean, std, val_frac: float = 0.1, distractors: int = 8):
         self.images, self.labels = cifar_split(root, split, val_frac)
-        self.size, self.target_px, self.distractors = size, target_px, distractors
+        self.size, self.target_px, self.distractors = size, (size // 16, size * 7 // 64), distractors
         self.train = split == "train"
         self.mean = torch.tensor(mean).view(3, 1, 1)
         self.std = torch.tensor(std).view(3, 1, 1)
