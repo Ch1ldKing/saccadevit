@@ -71,7 +71,7 @@ def fetch_weights(name: str, w) -> None:
 def fetch_source(name: str, s) -> None:
     dest = Path("third_party") / name
     with tempfile.TemporaryDirectory() as tmp:
-        git = lambda *a: subprocess.run(["git", "-C", tmp, *a], check=True, capture_output=True)  # noqa: E731
+        git = lambda *a: subprocess.run(["git", "-c", "http.version=HTTP/1.1", "-C", tmp, *a], check=True, capture_output=True)  # noqa: E731
         git("init", "-q")
         git("remote", "add", "origin", s.repo)
         if "subdir" in s:
