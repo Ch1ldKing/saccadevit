@@ -119,3 +119,34 @@ Test %, 25 tokens per look unless stated. Same-weights controls use the B5 check
 GPU breakdown for B5: ViT 13.9 ms (≈4.6 ms per 26-token look, about the same as a whole 197-token B0 pass, so launch-bound), policy 4.3, crop 2.9, embed 2.5, coarse 1.3. FLOP savings do not become time savings at batch 1. Candidate remedies: CUDA graphs / `torch.compile` per look, and fewer, larger looks.
 
 **Canvas:** canvas B0 34.5% test; Stage A val 6.7% (its val uses random looks, which rarely hit a 32–56 px target); B5 val 47.8%. Looking pays off where the target is small.
+
+## 2026-11-23: CUB, 3 seeds, and hypothesis tests
+
+Test %, mean ± std over seeds 0–2, 25 tokens per look. Full table: [CURRENT_RESULTS.md](CURRENT_RESULTS.md). Outputs: `output/<exp>/seed{0,1,2}/`.
+
+| Row | 1 look | 2 looks | 3 looks |
+|---|---|---|---|
+| random on B5 weights | 22.9 ± 0.4 | 32.9 ± 0.7 | 39.5 ± 0.5 |
+| saliency on B5 weights | 38.7 ± 0.2 | 46.5 ± 0.6 | 50.9 ± 0.2 |
+| **B5** | **58.6 ± 0.9** | **64.2 ± 0.4** | **66.4 ± 0.3** |
+| oracle gt on B5 weights | 60.5 ± 0.7 | 65.9 ± 0.2 | 68.8 ± 0.3 |
+| A5 q = none | 59.0 ± 1.5 | 64.6 ± 0.6 | 66.4 ± 0.3 |
+| A1 no offset PE | 57.7 ± 0.9 | 63.5 ± 0.6 | 65.5 ± 0.2 |
+| A6 learned top-K | 13.7 ± 1.2 | 19.9 ± 1.1 | 25.0 ± 1.0 |
+| B3 FocusViT-style (59 tokens) | 55.3 ± 1.1 | | |
+| B4 merge | 71.0 ± 0.2 (full image) | | |
+| A4 coarse only | 8.2 ± 0.2 | | |
+| B0 | 76.3 ± 0.2 | | |
+
+**Paired bootstrap** (3 seeds pooled, 2 looks; points, 95% CI). Output: `output/compare/<name>.json`.
+
+| Test | Δ (b − a) | 95% CI | Reading |
+|---|---|---|---|
+| H1 `h1_task_vs_saliency`: B5 vs saliency, same weights | **+17.7** | [16.6, 18.8] | ✓ in every stratum; largest on large objects (+23.0) |
+| H1 `h1_saliency_vs_random` | +13.7 | [12.5, 14.8] | Saliency beats random, most on small objects (+19.1) |
+| H1/A5 `h1_task_signal`: q on vs off | −0.4 | [−0.9, 0.2] | ✗ no effect from the task signal |
+| H2 `h2_stop`: τ=0.2 vs fixed K=3 | −0.04 | [−0.09, 0.01] | Equal accuracy with 2.3–2.9 mean looks instead of 3 (saves 5–25% of looks, seed-dependent) |
+
+**H3 sweep** is stable across seeds: at ρ = 0.15 / 0.25 / 0.5, test 66.4 / 74.9 / 79.7% at 0.46–0.53 / 0.69–0.90 / 1.2–1.7× B0 token-blocks. τ* ranges over 0.1–0.3 per seed. B0 is reached only above ~1.2× B0 cost.
+
+**Canvas (seed 0)**, test %, 3 looks: random 6.5, saliency 15.5, **B5 48.4**, B0 34.5. Here the learned policy beats the full image by 14 points with 75 tokens, because the 32–56 px target becomes tiny at 224².
