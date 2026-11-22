@@ -2,6 +2,7 @@
 
 The codebase for Group 3's NeuroAI project 3. Docs live outside this repo:
 - `../DESIGN.md`: the method, the 8 fixes to the slides, and the build order. **Source of truth for *why*.** If code and DESIGN.md disagree, update DESIGN.md in the same change.
+- `../DECISIONS.md`: open decisions waiting on the group. Do not settle them silently in code; when one is ticked, apply it to the configs.
 - `../../Saccadic_ViT_Presentation_EN 1.pptx`: the slides (research questions, baselines, targets, kill criteria).
 - `../../digests/总报告.md`, `../../dives/`: literature notes, including fallback routes A1/A3/D3.
 - `README.md`: commands and the experiment table. Keep it in sync when configs are added.
