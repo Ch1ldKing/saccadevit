@@ -1,0 +1,8 @@
+# B3: FocusViT-style static selection: one look at the whole image, fixed keep ratio.
+_base_: stage_a.yaml
+model:
+  policy: center
+  k_max: 1
+  keep_ratio: 0.3
+eval:
+  ckpt: runs/stage_a/seed${seed}/best.pt

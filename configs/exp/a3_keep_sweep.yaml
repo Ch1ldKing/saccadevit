@@ -1,0 +1,5 @@
+# A3 / H3: one B5 checkpoint swept over keep ratio 100% -> 10% (x tau x looks). Run with `sv sweep`.
+_base_: b5_ours.yaml
+eval:
+  ckpt: runs/b5_ours/seed${seed}/best.pt
+  keep_ratios: [1.0, 0.75, 0.5, 0.25, 0.15, 0.1]

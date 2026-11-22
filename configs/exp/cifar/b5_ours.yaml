@@ -1,0 +1,9 @@
+_base_: stage_a.yaml
+model:
+  policy: learned
+train:
+  stage: b
+  init: runs/cifar-stage_a/seed${seed}/best.pt
+  epochs: 10
+  lr: 3.0e-4
+  joint_lr_scale: 0.1

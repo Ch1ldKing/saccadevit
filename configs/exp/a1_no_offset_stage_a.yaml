@@ -1,0 +1,4 @@
+# A1 (part 1): Stage A without the offset term in the position embedding.
+_base_: stage_a.yaml
+model:
+  offset_pe: false

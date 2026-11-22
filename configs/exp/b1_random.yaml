@@ -1,0 +1,6 @@
+# B1: random looks, same budget, Stage-A checkpoint. Chance level for "where".
+_base_: stage_a.yaml
+model:
+  policy: random
+eval:
+  ckpt: runs/stage_a/seed${seed}/best.pt

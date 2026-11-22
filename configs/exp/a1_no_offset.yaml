@@ -1,0 +1,6 @@
+# A1: B5 trained on top of the no-offset Stage A.
+_base_: b5_ours.yaml
+model:
+  offset_pe: false
+train:
+  init: runs/a1_no_offset_stage_a/seed${seed}/best.pt

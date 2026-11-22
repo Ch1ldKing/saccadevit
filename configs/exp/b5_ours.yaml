@@ -1,0 +1,13 @@
+# B5 / Stage B (W4-6): REINFORCE the task-conditioned policy with the self-reward. Gate M3 (H1).
+_base_: stage_a.yaml
+model:
+  policy: learned
+  task: coarse_logits
+train:
+  stage: b
+  init: runs/stage_a/seed${seed}/best.pt
+  epochs: 20
+  lr: 3.0e-4
+  joint_lr_scale: 0.1
+eval:
+  keep_ratios: [0.1, 0.15, 0.25, 0.5]

@@ -1,0 +1,9 @@
+# B0 / Stage 0 (W1): ViT-Ti/16 fine-tuned on the whole image at 224^2. Upper bound; init for all others.
+_base_: ../base.yaml
+model:
+  kind: full
+train:
+  stage: full
+  epochs: 50
+  lr: 3.0e-4
+  warmup_epochs: 3

@@ -1,0 +1,28 @@
+[project]
+name = "saccadevit"
+version = "0.1.0"
+description = "Task-conditioned saccadic sampling (look, keep, stop) for a lightweight ViT"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "timm>=1.0.9",
+    "omegaconf>=2.3",
+    "numpy>=1.26",
+    "pillow>=10",
+    "tqdm>=4.66",
+]
+
+[project.scripts]
+sv = "saccadevit.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

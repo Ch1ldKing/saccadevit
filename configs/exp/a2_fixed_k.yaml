@@ -1,0 +1,6 @@
+# A2: stopping removed: B5 checkpoint, always K_max looks (tau = 0). Compare at matched accuracy (H2).
+_base_: b5_ours.yaml
+eval:
+  ckpt: runs/b5_ours/seed${seed}/best.pt
+  taus: [0.0]
+  tau: 0.0

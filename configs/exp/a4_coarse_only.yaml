@@ -1,0 +1,6 @@
+# A4: coarse pass only, no aim and no looks: what the looks buy at all.
+_base_: b5_ours.yaml
+model:
+  k_max: 0
+eval:
+  ckpt: runs/b5_ours/seed${seed}/best.pt

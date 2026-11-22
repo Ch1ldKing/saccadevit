@@ -1,0 +1,8 @@
+# B4: CAIT-style neighbour merging (196 -> 98 -> 49) fine-tuned from B0. Merging vs gathering.
+_base_: b0_full.yaml
+model:
+  kind: merge
+train:
+  init: runs/b0_full/seed${seed}/best.pt
+  epochs: 30
+  lr: 1.0e-4

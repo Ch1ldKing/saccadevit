@@ -1,0 +1,5 @@
+_base_: stage_a.yaml
+model:
+  policy: saliency
+eval:
+  ckpt: runs/canvas-stage_a/seed${seed}/best.pt

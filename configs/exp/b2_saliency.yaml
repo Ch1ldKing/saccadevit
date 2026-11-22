@@ -1,0 +1,6 @@
+# B2: bottom-up spectral-residual saliency top cells ("look where it is bright"), Stage-A checkpoint.
+_base_: stage_a.yaml
+model:
+  policy: saliency
+eval:
+  ckpt: runs/stage_a/seed${seed}/best.pt

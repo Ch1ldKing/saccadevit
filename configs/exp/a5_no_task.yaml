@@ -1,0 +1,4 @@
+# A5 / H1: same pipeline and budget, task signal q switched off; policy retrained from Stage A.
+_base_: b5_ours.yaml
+model:
+  task: none

@@ -1,0 +1,10 @@
+# Stage A (W2-3): train M3 (look) + M4 (accumulate) with teacher fixations; policy untouched.
+# Random K and keep ratio per batch so the checkpoint serves every budget. Gate M2.
+_base_: ../base.yaml
+model:
+  policy: random          # val selection uses random looks (= B1 protocol)
+train:
+  stage: a
+  init: runs/b0_full/seed${seed}/best.pt
+  epochs: 40
+  lr: 1.0e-3
