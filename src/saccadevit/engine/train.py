@@ -3,6 +3,7 @@
 import json
 import math
 import time
+from pathlib import Path
 
 import torch
 from omegaconf import OmegaConf
@@ -50,6 +51,9 @@ def validate(model, loader, cfg, dev) -> float:
 
 
 def run(cfg) -> None:
+    if (Path(cfg.out_dir) / "done").exists():  # make pipelines re-enter finished runs
+        print(f"skip {cfg.out_dir}: already trained (delete its 'done' file to retrain)")
+        return
     seed_all(cfg.seed)
     dev = device()
     out = out_dir(cfg)
@@ -95,4 +99,5 @@ def run(cfg) -> None:
         if val_acc > best:
             best = val_acc
             torch.save(ckpt, out / "best.pt")
+    (out / "done").write_text(f"best val acc {best:.4f}\n")
     print(f"best val acc {best:.4f} -> {out / 'best.pt'}")
