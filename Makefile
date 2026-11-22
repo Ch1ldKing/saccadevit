@@ -10,7 +10,7 @@ export PYTHONDONTWRITEBYTECODE := 1
 # Run order on CUB: train_b0_full -> train_stage_a -> evaluate_* (B1-B3, oracle) -> train_b5_ours -> ...
 # `make preliminary` = the seed-0 subset for first results; `make cub` = the whole CUB matrix for SEED.
 
-.PHONY: help setup input_fetch input_verify third_party_fetch weights_fetch validate_configurations test
+.PHONY: help setup input_fetch input_verify third_party_fetch weights_fetch validate_configurations test report
 help:
 	@echo "make <target> [SEED=k] [ARGS='key=value ...'];  make -n <target> previews"
 	@grep -E '^[a-z0-9_]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-34s %s\n", $$1, $$2}'
@@ -36,6 +36,9 @@ input_verify: ## file counts + SHA-256 of everything fetched
 
 validate_configurations: ## load all experiment configs, build every model, check checkpoint links
 	$(SV) validate
+
+report: ## collect output/ into docs/CURRENT_RESULTS.md (configs, results, paths)
+	$(SV) report
 
 test: ## lean test suite on fake CUB (CPU)
 	$(UV) run pytest -q
@@ -79,13 +82,13 @@ latency_all: $(addprefix latency_gpu_,$(LATENCY)) $(addprefix latency_cpu_,$(LAT
 # ---------------------------------------------------------------- hypothesis tests (3 seeds pooled)
 .PHONY: compare_h1_task_vs_saliency compare_h1_saliency_vs_random compare_h1_task_signal compare_h2_stop
 compare_h1_task_vs_saliency: ## H1: B5 vs B2 at the same budget
-	$(SV) compare 'output/b2_saliency/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2
+	$(SV) compare 'output/b2_saliency/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2 --name h1_task_vs_saliency
 compare_h1_saliency_vs_random: ## H1: B2 vs B1
-	$(SV) compare 'output/b1_random/seed*/eval_test.npz' 'output/b2_saliency/seed*/eval_test.npz' --rule k=2
+	$(SV) compare 'output/b1_random/seed*/eval_test.npz' 'output/b2_saliency/seed*/eval_test.npz' --rule k=2 --name h1_saliency_vs_random
 compare_h1_task_signal: ## H1 / A5: same model, q off vs on
-	$(SV) compare 'output/a5_no_task/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2
+	$(SV) compare 'output/a5_no_task/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2 --name h1_task_signal
 compare_h2_stop: ## H2: same B5 checkpoint, fixed K_max vs entropy stop (TAU = tau* from sweep.csv)
-	$(SV) compare 'output/a2_fixed_k/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule-a last --rule-b tau=$(or $(TAU),0.4)
+	$(SV) compare 'output/a2_fixed_k/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule-a last --rule-b tau=$(or $(TAU),0.4) --name h2_stop
 
 # ---------------------------------------------------------------- second task (canvas) and control (CIFAR)
 .PHONY: train_canvas_b0_full train_canvas_stage_a train_canvas_b5_ours evaluate_canvas_all train_cifar_b0_full train_cifar_stage_a train_cifar_b5_ours evaluate_cifar_all

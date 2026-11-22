@@ -3,6 +3,7 @@ reported overall and per stratum (coarse pass right/wrong, object-size tercile).
 
 import glob
 import json
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -32,7 +33,7 @@ def paired_bootstrap(a: np.ndarray, b: np.ndarray, n: int = 10_000, seed: int = 
             "p_le_0": float((boots <= 0).mean()), "n": int(len(diff))}
 
 
-def compare(glob_a: str, glob_b: str, rule_a: str = "last", rule_b: str = "last") -> dict:
+def compare(glob_a: str, glob_b: str, rule_a: str = "last", rule_b: str = "last", name: str | None = None) -> dict:
     pa, pb = sorted(glob.glob(glob_a)), sorted(glob.glob(glob_b))
     assert len(pa) == len(pb) > 0, (pa, pb)
     A, B, ref = [], [], None
@@ -51,4 +52,8 @@ def compare(glob_a: str, glob_b: str, rule_a: str = "last", rule_b: str = "last"
     res = {"a": pa, "b": pb, "rule_a": rule_a, "rule_b": rule_b, "acc_a": float(A.mean()), "acc_b": float(B.mean())}
     res |= {name: paired_bootstrap(A[:, m], B[:, m]) for name, m in strata.items() if m.any()}
     print(json.dumps(res, indent=2))
+    if name:
+        out = Path("output/compare") / f"{name}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(res, indent=2))
     return res
