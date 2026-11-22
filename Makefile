@@ -62,7 +62,7 @@ train_a1_no_offset: ## A1 part 2: stage B on the no-offset stage A
 train_a6_topk_stage_a: ## A6: stage A with learned top-K instead of resize glimpses (also B3's checkpoint)
 	$(SV) train $(E)/a6_topk_stage_a.yaml seed=$(SEED) $(ARGS)
 
-CUB_EVALS := b0_full b4_merge a6_topk_stage_a b1_random b2_saliency b3_focusvit oracle_gt b5_ours a1_no_offset a2_fixed_k a4_coarse_only a5_no_task
+CUB_EVALS := b0_full b4_merge a6_topk_stage_a b1_random b2_saliency b3_focusvit oracle_gt b5_ours b1_random_on_b5 b2_saliency_on_b5 oracle_gt_on_b5 a1_no_offset a2_fixed_k a4_coarse_only a5_no_task
 .PHONY: $(addprefix evaluate_,$(CUB_EVALS)) sweep_a3_keep_sweep
 $(addprefix evaluate_,$(CUB_EVALS)): evaluate_%: ## test-set eval -> output/<exp>/seed<k>/summary_test.json
 	$(SV) eval $(E)/$*.yaml seed=$(SEED) $(ARGS)
@@ -83,10 +83,10 @@ latency_all: $(addprefix latency_gpu_,$(LATENCY)) $(addprefix latency_cpu_,$(LAT
 
 # ---------------------------------------------------------------- hypothesis tests (3 seeds pooled)
 .PHONY: compare_h1_task_vs_saliency compare_h1_saliency_vs_random compare_h1_task_signal compare_h2_stop
-compare_h1_task_vs_saliency: ## H1: B5 vs B2 at the same budget
-	$(SV) compare 'output/b2_saliency/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2 --name h1_task_vs_saliency
-compare_h1_saliency_vs_random: ## H1: B2 vs B1
-	$(SV) compare 'output/b1_random/seed*/eval_test.npz' 'output/b2_saliency/seed*/eval_test.npz' --rule k=2 --name h1_saliency_vs_random
+compare_h1_task_vs_saliency: ## H1: B5 vs saliency on the same B5 weights, same budget
+	$(SV) compare 'output/b2_saliency_on_b5/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2 --name h1_task_vs_saliency
+compare_h1_saliency_vs_random: ## H1: saliency vs random on the same B5 weights
+	$(SV) compare 'output/b1_random_on_b5/seed*/eval_test.npz' 'output/b2_saliency_on_b5/seed*/eval_test.npz' --rule k=2 --name h1_saliency_vs_random
 compare_h1_task_signal: ## H1 / A5: same model, q off vs on
 	$(SV) compare 'output/a5_no_task/seed*/eval_test.npz' 'output/b5_ours/seed*/eval_test.npz' --rule k=2 --name h1_task_signal
 compare_h2_stop: ## H2: same B5 checkpoint, fixed K_max vs entropy stop (TAU = tau* from sweep.csv)

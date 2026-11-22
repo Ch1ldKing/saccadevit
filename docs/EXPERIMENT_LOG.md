@@ -73,3 +73,18 @@ So backbone tuning is the main lever, but the scorer is still no better than ran
 
 **Decision (2026-11-23).** The default glimpse becomes `select: resize` with blocks 3–12 tuned, and crop scales {80, 112, 160, 224}. This is a foveal glimpse: a budget of g² tokens covers the whole crop, and zoom is the policy's scale choice. FocusViT-style learned top-K becomes ablation **A6** (`a6_topk_stage_a`), and B3 evaluates that checkpoint so B3 stays faithful to FocusViT. The v0 runs are archived in `output/_v0/`. B0 and canvas B0 are unaffected and kept.
 
+
+## 2026-11-23: preliminary CUB seed 0 with the resize glimpse
+
+Test %, 25 tokens per look (ρ=0.15). Stage A best val 41.9; A6 (top-K) 26.7; B5 66.9.
+
+| Run | 1 look | 2 looks | 3 looks |
+|---|---|---|---|
+| B1 random (Stage-A weights) | 23.3 | 33.3 | 40.3 |
+| B2 saliency (Stage-A weights) | 38.2 | 45.5 | 50.5 |
+| **B5 learned, task-conditioned** | **58.8** | **64.2** | **66.5** |
+| Oracle gt (Stage-A weights) | 59.8 | 66.4 | 68.9 |
+| B3 FocusViT-style, whole image, top-K 30% | 55.2 | | |
+| B0 full image, 196 tokens | 76.1 | | |
+
+The learned policy nearly reaches the ground-truth oracle and beats saliency by 16 points at 3 looks. **Caveat:** Stage B also fine-tunes M1/M3/M4 (joint lr 0.1×), so B1/B2 differ from B5 in more than the policy. Added `b1_random_on_b5`, `b2_saliency_on_b5` and `oracle_gt_on_b5` (policy is the only difference). The H1 comparisons now use those.

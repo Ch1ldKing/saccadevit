@@ -1,0 +1,7 @@
+# H1 control: b2 policy on the B5 checkpoint, so the policy is the only difference from B5
+# (Stage B also fine-tunes M1/M3/M4 at low lr).
+_base_: b5_ours.yaml
+model:
+  policy: saliency
+eval:
+  ckpt: output/b5_ours/seed${seed}/best.pt
