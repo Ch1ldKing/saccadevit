@@ -51,7 +51,9 @@ def fetch_dataset(name: str, d) -> None:
     else:
         archive = dest / Path(d.url).name
         print(f"[dataset] {name}: downloading {d.url}")
-        urllib.request.urlretrieve(d.url, archive)
+        req = urllib.request.Request(d.url, headers={"User-Agent": "saccadevit-setup/0.1"})  # default Python-urllib gets 403
+        with urllib.request.urlopen(req) as r, archive.open("wb") as f:
+            shutil.copyfileobj(r, f, 1 << 20)
         with tarfile.open(archive) as tar:
             tar.extractall(dest, filter="data")
     _record(f"dataset/{name}", archive)
