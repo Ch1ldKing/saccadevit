@@ -88,3 +88,34 @@ Test %, 25 tokens per look (ρ=0.15). Stage A best val 41.9; A6 (top-K) 26.7; B5
 | B0 full image, 196 tokens | 76.1 | | |
 
 The learned policy nearly reaches the ground-truth oracle and beats saliency by 16 points at 3 looks. **Caveat:** Stage B also fine-tunes M1/M3/M4 (joint lr 0.1×), so B1/B2 differ from B5 in more than the policy. Added `b1_random_on_b5`, `b2_saliency_on_b5` and `oracle_gt_on_b5` (policy is the only difference). The H1 comparisons now use those.
+
+## 2026-11-23: full CUB matrix, seed 0
+
+Test %, 25 tokens per look unless stated. Same-weights controls use the B5 checkpoint.
+
+| Row | 1 look | 2 looks | 3 looks | Reading |
+|---|---|---|---|---|
+| random on B5 weights | 22.9 | 33.3 | 39.4 | |
+| saliency on B5 weights | 38.4 | 45.6 | 50.7 | |
+| **B5** | **58.8** | **64.2** | **66.5** | Learned aim: +15.8 over saliency with the same weights (H1, policy part ✓) |
+| oracle gt on B5 weights | 59.6 | 65.7 | 68.6 | B5 is 2 points short of the oracle |
+| A5 q = none | 58.4 | 64.5 | 66.4 | **The task signal adds nothing** (H1, task part ✗); the coarse head is only ~8% accurate, so q is nearly uninformative |
+| A1 no offset PE | 58.7 | 64.3 | 65.8 | Negligible |
+| A6 learned top-K, Stage A | 15.4 | 21.4 | 26.5 | Confirms the resize decision |
+| B3 FocusViT-style, 1 look, top-K 30% | 55.2 | | | |
+| B4 CAIT-style merge | 70.7 (full image, 1.41 GFLOPs) | | | |
+| A4 coarse pass only | 8.0 | | | |
+| B0 | 76.1 (196 tokens, 2.51 GFLOPs) | | | |
+
+**H3 sweep (one checkpoint, τ* from val):** ρ 0.10 / 0.15 / 0.25 / 0.5 / 1.0 gives 54.4 / 66.5 / 74.7 / 79.8 / 80.4% at 0.37 / 0.53 / 0.90 / 1.41 / 2.22× B0 token-blocks. Above B0's cost the model beats B0; at equal cost (ρ=0.25) it is 1.4 points below. τ* is small (0.1–0.3), so entropy stopping rarely saves looks (2.5–2.9 mean looks).
+
+**K2 fires.** Batch-1 latency, 3 looks, ρ=0.15 (1.38 GFLOPs vs 2.51):
+
+| | RTX 3090 p50 | CPU p50 |
+|---|---|---|
+| B0 | 4.2 ms | 28.9 ms |
+| B5 | 25.3 ms | 58.8 ms |
+
+GPU breakdown for B5: ViT 13.9 ms (≈4.6 ms per 26-token look, about the same as a whole 197-token B0 pass, so launch-bound), policy 4.3, crop 2.9, embed 2.5, coarse 1.3. FLOP savings do not become time savings at batch 1. Candidate remedies: CUDA graphs / `torch.compile` per look, and fewer, larger looks.
+
+**Canvas:** canvas B0 34.5% test; Stage A val 6.7% (its val uses random looks, which rarely hit a 32–56 px target); B5 val 47.8%. Looking pays off where the target is small.
