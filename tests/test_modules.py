@@ -15,12 +15,12 @@ def test_cub_geometry_normalised(fake_cub):
 def test_topk_soft_rows_sum_to_one_and_hard_gathers():
     x, scores = torch.randn(2, 196, 8), torch.randn(2, 196, requires_grad=True)
     topk = TopK(sigma=0.05, samples=8).train()
-    out = topk(x, scores, 49)
+    out, keep = topk(x, scores, 49)
     out.sum().backward()
-    assert out.shape == (2, 49, 8) and scores.grad.abs().sum() > 0
+    assert out.shape == (2, 49, 8) and scores.grad.abs().sum() > 0 and torch.allclose(keep.sum(1), torch.full((2,), 49.0))
     topk.eval()
     idx = scores.topk(49, dim=1).indices.sort(dim=1).values
-    assert torch.equal(topk(x, scores, 49), x[torch.arange(2)[:, None], idx])
+    assert torch.equal(topk(x, scores, 49)[0], x[torch.arange(2)[:, None], idx])
 
 
 def test_boxes_stay_inside_image():

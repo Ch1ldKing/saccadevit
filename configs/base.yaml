@@ -29,6 +29,8 @@ model:
   offset_pe: true         # A1 switches this off
   topk_sigma: 0.05
   topk_samples: 16
+  select_distill: false   # supervise the token scorer with the backbone's CLS attention (train only)
+  fuse_rest: false        # EViT: one extra token = score-weighted mean of the dropped tokens
   k_max: 3
   merge_at: [4, 7]        # B4 only: merge before blocks 5 and 8
 
@@ -47,6 +49,7 @@ train:
   joint_lr_scale: 0.0     # stage b: lr scale for M1/M3/M4 (0 = frozen)
   keep_ratio_range: [0.1, 1.0]
   coarse_weight: 0.5
+  select_weight: 1.0      # weight of the scorer distillation KL (only if model.select_distill)
   cost_weight: 0.0        # lambda in the stage-b reward
   entropy_weight: 0.01
   ce_weight: 1.0

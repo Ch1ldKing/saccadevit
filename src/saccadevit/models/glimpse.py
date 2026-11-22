@@ -63,11 +63,27 @@ class TopK(nn.Module):
         self.sigma, self.samples = sigma, samples
 
     def forward(self, x, scores, k: int):
+        """-> (kept tokens (B, k, D), keep weight per input token (B, N))."""
         if self.training:
             s = (scores - scores.mean(1, keepdim=True)) / (scores.std(1, keepdim=True) + 1e-6)
-            return PerturbedTopK.apply(s.float(), k, self.samples, self.sigma).to(x.dtype) @ x
+            ind = PerturbedTopK.apply(s.float(), k, self.samples, self.sigma).to(x.dtype)
+            return ind @ x, ind.sum(1)
         idx = scores.topk(k, dim=1).indices.sort(dim=1).values
-        return x.gather(1, idx[..., None].expand(-1, -1, x.shape[-1]))
+        keep = torch.zeros_like(scores).scatter_(1, idx, 1.0)
+        return x.gather(1, idx[..., None].expand(-1, -1, x.shape[-1])), keep
+
+
+@torch.no_grad()
+def cls_attention(bb: Backbone, x: torch.Tensor) -> torch.Tensor:
+    """Teacher for the scorer: last-block CLS attention (head mean) of the full token set -> (B, N)."""
+    h = bb.encode(x, 0, bb.depth - 1)
+    blk = bb.vit.blocks[-1]
+    a = blk.attn
+    B, n, D = h.shape
+    qkv = a.qkv(blk.norm1(h)).reshape(B, n, 3, a.num_heads, D // a.num_heads).permute(2, 0, 3, 1, 4)
+    q, k = a.q_norm(qkv[0]), a.k_norm(qkv[1])
+    att = ((q[:, :, :1] * a.scale) @ k.transpose(-2, -1)).float().softmax(-1).mean(1)[:, 0, 1:]
+    return att / att.sum(-1, keepdim=True)
 
 
 class Translator(nn.Module):
@@ -101,9 +117,10 @@ def shift_patches(crop: torch.Tensor, offset: torch.Tensor) -> torch.Tensor:
 
 
 class Glimpse(nn.Module):
-    def __init__(self, dim: int, grid: int, translate: bool, offset_pe: bool, sigma: float, samples: int):
+    def __init__(self, dim: int, grid: int, translate: bool, offset_pe: bool, sigma: float, samples: int,
+                 distill: bool = False, fuse_rest: bool = False):
         super().__init__()
-        self.grid = grid
+        self.grid, self.distill, self.fuse_rest = grid, distill, fuse_rest
         self.translator = Translator() if translate else None
         self.offset_pe = mlp(2, 64, dim) if translate and offset_pe else None
         self.loc_pe = mlp(3, 64, dim)
@@ -111,7 +128,7 @@ class Glimpse(nn.Module):
         self.topk = TopK(sigma, samples)
 
     def forward(self, img, box, keep_ratio: float, bb: Backbone, sec):
-        """img: (B, 3, S, S); box: (B, 4) normalised xyxy -> (z: (B, D), tokens kept)."""
+        """img: (B, 3, S, S); box: (B, 4) normalised xyxy -> (z (B, D), tokens fed to the ViT, scorer aux loss)."""
         with sec("crop"):
             S = img.shape[-1]
             rois = torch.cat([torch.arange(len(box), device=box.device, dtype=box.dtype)[:, None], box * S], 1)
@@ -127,8 +144,17 @@ class Glimpse(nn.Module):
             xy = box[:, None, :2] + cell_centers(self.grid, box.device)[None] * side
             x = x + self.loc_pe(torch.cat([xy, side.expand(-1, xy.shape[1], 1)], -1).to(x.dtype))
             k = max(1, round(keep_ratio * x.shape[1]))
+            scores = self.scorer(x).squeeze(-1)
+            aux = scores.new_zeros((), dtype=torch.float)
+            if self.training and self.distill:  # supervise the scorer with the backbone's own CLS attention
+                aux = F.kl_div(scores.float().log_softmax(-1), cls_attention(bb, x), reduction="batchmean")
             if k < x.shape[1]:
-                x = self.topk(x, self.scorer(x).squeeze(-1), k)
+                kept, keep = self.topk(x, scores, k)
+                if self.fuse_rest:  # EViT: fold the dropped tokens into one score-weighted token
+                    w = (1 - keep).clamp(min=0) * scores.float().softmax(-1)
+                    rest = (w[..., None] * x.float()).sum(1, keepdim=True) / (w.sum(1)[:, None, None] + 1e-6)
+                    kept, k = torch.cat([kept, rest.to(kept.dtype)], 1), k + 1
+                x = kept
         with sec("vit"):
             z = bb.vit.norm(bb.encode(x))[:, 0]
-        return z, k
+        return z, k, aux

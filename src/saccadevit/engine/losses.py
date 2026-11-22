@@ -24,8 +24,8 @@ def loss_stage_a(model, batch, cfg):
     y = batch["label"]
     r = model(batch["image"], k=k, keep_ratio=rho, policy="mix", box=batch["box"], parts=batch["parts"])
     looks = torch.stack([_ce(l, y, cfg) for l in r.logits[1:]]).mean()
-    loss = looks + cfg.train.coarse_weight * _ce(r.logits[0], y, cfg)
-    return loss, {"ce_looks": looks, "acc": (r.logits[-1].argmax(-1) == y).float().mean()}
+    loss = looks + cfg.train.coarse_weight * _ce(r.logits[0], y, cfg) + cfg.train.select_weight * r.aux
+    return loss, {"ce_looks": looks, "select_kl": r.aux, "acc": (r.logits[-1].argmax(-1) == y).float().mean()}
 
 
 def loss_stage_b(model, batch, cfg):
@@ -44,7 +44,7 @@ def loss_stage_b(model, batch, cfg):
     pg = -(adv * r.logp).mean()
     ent = r.entropy.mean()
     ce = torch.stack([_ce(l, y, cfg) for l in r.logits[1:]]).mean()
-    loss = pg - t.entropy_weight * ent + t.ce_weight * ce
+    loss = pg - t.entropy_weight * ent + t.ce_weight * ce + t.select_weight * r.aux
     return loss, {"pg": pg, "ent": ent, "ret": ret[0].mean(), "acc": (r.logits[-1].argmax(-1) == y).float().mean()}
 
 

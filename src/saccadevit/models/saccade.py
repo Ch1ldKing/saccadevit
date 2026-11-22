@@ -40,6 +40,7 @@ class State:
     p0: torch.Tensor
     visited: torch.Tensor
     saliency: torch.Tensor | None = None
+    aux: float | torch.Tensor = 0.0  # scorer distillation loss summed over looks
 
 
 @dataclass
@@ -47,7 +48,8 @@ class Rollout:
     logits: torch.Tensor  # (T+1, B, C); row 0 = coarse pass
     logp: torch.Tensor | None  # (T, B), learned policy only
     entropy: torch.Tensor | None  # (T, B)
-    tokens: list[int]  # tokens kept per look
+    tokens: list[int]  # tokens fed to the ViT per look
+    aux: float | torch.Tensor = 0.0  # mean scorer distillation loss per look
 
 
 class SaccadeViT(nn.Module):
@@ -58,7 +60,7 @@ class SaccadeViT(nn.Module):
         self.coarse = CoarseLook(D, m.coarse_depth, m.num_classes)
         self.task = TaskEncoder(m.task, m.num_classes, D)
         self.policy = LearnedPolicy(D, len(m.scales))
-        self.glimpse = Glimpse(D, self.grid, m.translate, m.offset_pe, m.topk_sigma, m.topk_samples)
+        self.glimpse = Glimpse(D, self.grid, m.translate, m.offset_pe, m.topk_sigma, m.topk_samples, m.select_distill, m.fuse_rest)
         self.agg = Aggregator(D, m.num_classes)
         self.img_size = m.img_size
         self.num_scales = len(m.scales)
@@ -96,7 +98,8 @@ class SaccadeViT(nn.Module):
 
     def look(self, st: State, img, a: Action, keep_ratio: float, sec=_no_timer):
         box = action_boxes(a.cell, self.sides[a.scale], self.grid)
-        z, k = self.glimpse(img, box, keep_ratio, self.backbone, sec)
+        z, k, aux = self.glimpse(img, box, keep_ratio, self.backbone, sec)
+        st.aux = st.aux + aux
         with sec("aggregate"):
             st.e, logits = self.agg.step(st.e, z)
         st.visited = st.visited | covered_cells(box, a.cell, self.grid)
@@ -119,7 +122,7 @@ class SaccadeViT(nn.Module):
                 logps.append(a.logp)
                 ents.append(a.entropy)
         stack = lambda xs: torch.stack(xs) if xs else None  # noqa: E731
-        return Rollout(torch.stack([x.float() for x in logits]), stack(logps), stack(ents), tokens)
+        return Rollout(torch.stack([x.float() for x in logits]), stack(logps), stack(ents), tokens, st.aux / max(k, 1))
 
     @torch.no_grad()
     def infer(self, img, tau: float, k=None, keep_ratio=None, policy=None, timer=None):
