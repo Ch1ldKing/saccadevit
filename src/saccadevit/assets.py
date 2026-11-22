@@ -75,6 +75,7 @@ def fetch_source(name: str, s) -> None:
         git("init", "-q")
         git("remote", "add", "origin", s.repo)
         if "subdir" in s:
+            git("sparse-checkout", "init", "--cone")  # explicit: older git defaults to non-cone
             git("sparse-checkout", "set", s.subdir)
         git("fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", s.commit)
         git("checkout", "-q", "FETCH_HEAD")
