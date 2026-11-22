@@ -34,18 +34,30 @@ def _runs() -> dict[str, list[Path]]:
     return runs
 
 
+def _status(d: Path, trains: bool) -> str:
+    """✓ finished · ▶ running / partial · – not started"""
+    if not d.exists():
+        return "–"
+    if trains:
+        return "✓" if (d / "done").exists() else "▶"
+    return "✓" if any(d.glob("summary_test.json")) or any(d.glob("sweep.csv")) else "▶"
+
+
 def _registry(runs) -> str:
+    from ..config import EXP_ROOT, load_config
+
     rows = []
-    for name, dirs in runs.items():
-        c = OmegaConf.load(dirs[0] / "config.yaml")
-        m = c.model
-        trained = [d for d in dirs if (d / "best.pt").exists()]
-        evald = [d for d in dirs if (d / "summary_test.json").exists()]
+    for p in sorted(EXP_ROOT.rglob("*.yaml")):
+        c = load_config(p)
+        m, name = c.model, c.name
+        trains = not str(c.eval.ckpt).startswith("output/") or str(c.eval.ckpt).startswith(f"output/{name}/")
         what = m.kind if m.kind != "saccade" else f"{m.policy}, q={m.task}, K={m.k_max}, ρ={m.keep_ratio}"
-        stage = c.train.stage if trained else "eval"
-        val = [max(json.loads(l)["val_acc"] for l in open(d / "metrics.jsonl")) for d in trained if (d / "metrics.jsonl").exists()]
-        rows.append([name, c.data.dataset, what, stage, len(trained) or "–", len(evald) or "–", _ms(val), f"`output/{name}/seed*/`"])
-    return _table(["Experiment", "Data", "Model / policy", "Stage", "Trained", "Evaluated", "Best val acc %", "Path"], rows)
+        role = f"train ({c.train.stage})" if trains else f"eval of {Path(c.eval.ckpt).parts[1]}"
+        seeds = " ".join(_status(OUT / name / f"seed{s}", trains) for s in range(3))
+        val = [max(json.loads(l)["val_acc"] for l in open(d / "metrics.jsonl"))
+               for d in runs.get(name, []) if (d / "metrics.jsonl").exists() and (d / "done").exists()]
+        rows.append([name, c.data.dataset, what, role, seeds, _ms(val), f"`output/{name}/seed*/`"])
+    return _table(["Experiment", "Data", "Model / policy", "Role", "Seeds 0 1 2", "Best val acc %", "Path"], rows)
 
 
 def _accuracy(runs) -> str:
