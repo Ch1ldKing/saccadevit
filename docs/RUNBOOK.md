@@ -39,3 +39,13 @@ Dependencies: `train_b0_full` → `train_stage_a` → (`evaluate_b1/b2/b3/oracle
 | `latency_{cuda,cpu}.json` (p50, p95, per-module ms, GFLOPs, peak memory) | latency |
 
 After the sweep, pass its τ* to `latency_gpu_b5_ours_stop TAU=…` and `compare_h2_stop TAU=…`.
+
+## newpc (booked RTX 5090 D workstation)
+
+A reboot wipes home, so every booking starts from scratch. The link to it runs at about 100 KB/s, so copy only results and essential checkpoints.
+
+1. `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `rsync` the repo to `~/saccadevit` (no `input/`, `output/`), then `uv sync` (~5 min, 5 GB).
+2. `uv run sv assets fetch --only weights` (fast), then CUB through `--only cub` (~2 min). Start CIFAR-100 early: torchvision downloads it at ~70 KB/s (~40 min), and the canvas needs it.
+3. Stream the checkpoints you need from hitcvsz4 through the Mac: `ssh hitcvsz4 'tar cf - output/...' | ssh newpc 'cd ~/saccadevit && tar xf -'` (~4 min per 24 MB).
+4. Run one queue in tmux. Every step checks a hard stop (`date +%H%M` in CST) at least 20 min before the booking ends.
+5. Before leaving: `rsync` results back (`*.json *.csv *.yaml done *.log`, never `latency_cpu*` from newpc, because its VM CPUs are not representative), plus any new `best.pt` you will need again.
