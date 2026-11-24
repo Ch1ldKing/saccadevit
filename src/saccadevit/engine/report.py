@@ -180,9 +180,13 @@ Accuracy is on the test split; mean ± std over the seeds listed. acc@k = after 
 
 {_pareto("")}
 
-## Accuracy vs time: canvas
+## Accuracy vs time: canvas 512² (targets 32–56 px)
 
 {_pareto("canvas-")}
+
+## Accuracy vs time: canvas 768² (same targets, smaller fraction of the image)
+
+{_pareto("canvas768-")}
 
 ## Hypothesis tests (paired bootstrap over test images, seeds pooled)
 
