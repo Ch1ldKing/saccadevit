@@ -62,10 +62,31 @@ def graph(fn, *inputs):
     return run
 
 
+class _Autocast:
+    """Runs every model entry point under bf16 autocast (weights stay fp32, as in training and eval)."""
+
+    def __init__(self, model):
+        self.model, self.m = model, getattr(model, "m", None)
+
+    def __getattr__(self, name):
+        fn = getattr(self.model, name)
+        return lambda *a, **kw: self._amp(fn, *a, **kw)
+
+    def __call__(self, *a, **kw):
+        return self._amp(self.model, *a, **kw)
+
+    @staticmethod
+    def _amp(fn, *a, **kw):
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            return fn(*a, **kw)
+
+
 def make_forward(model, cfg, example, use_graph: bool):
-    """-> f(img) returning looks taken (0 for full-image models)."""
+    """-> f(img) returning looks taken (0 for full-image models). eval.half = bf16 autocast."""
     tau, rho, k = cfg.eval.tau, cfg.eval.keep_ratio, cfg.model.k_max
-    saccade = isinstance(model, SaccadeViT)
+    if cfg.eval.half and example.is_cuda:
+        model = _Autocast(model)
+    saccade = isinstance(getattr(model, "model", model), SaccadeViT)
     batched = len(example) > 1
     if not use_graph:
         if not saccade:
@@ -101,10 +122,8 @@ def run(cfg) -> dict:
     bs = cfg.eval.latency_batch
     out = out_dir(cfg)
     model = load_for_eval(cfg, dev)
-    if cfg.eval.half:
-        model = model.to(torch.bfloat16)
     ds = build_dataset(cfg, "test", *model.backbone.norm_stats)
-    dtype = torch.bfloat16 if cfg.eval.half else torch.float32
+    dtype = torch.float32
     n = cfg.eval.latency_images
     images = [torch.stack([ds[(i * bs + j) % len(ds)]["image"] for j in range(bs)]).to(dev, dtype) for i in range(n)]
     fwd = make_forward(model, cfg, images[0], use_graph)
@@ -123,8 +142,9 @@ def run(cfg) -> dict:
         total.append((time.perf_counter() - t0) * 1e3)
     sections = {}
     if not use_graph and bs == 1 and isinstance(model, SaccadeViT):
-        for img in images:
-            model.infer(img, cfg.eval.tau, keep_ratio=cfg.eval.keep_ratio, timer=timer)
+        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=bool(cfg.eval.half) and dev.type == "cuda"):
+            for img in images:
+                model.infer(img, cfg.eval.tau, keep_ratio=cfg.eval.keep_ratio, timer=timer)
         sections = {k: float(np.sum(v) / n) for k, v in timer.ms.items()}
     eager = make_forward(model, cfg, images[0], False)
     with FlopCounterMode(display=False) as fc:

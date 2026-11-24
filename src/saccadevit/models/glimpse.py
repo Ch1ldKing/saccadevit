@@ -126,6 +126,24 @@ class Glimpse(nn.Module):
         self.loc_pe = mlp(3, 64, dim)
         self.scorer = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, 1))
         self.topk = TopK(sigma, samples)
+        self._cache = {}
+
+    def _grid_terms(self, bb: Backbone, g: int, device):
+        """Position embedding resampled to g x g and the g x g cell centres. Cached at inference (fewer kernels)."""
+        key = (g, device, bb.pos_patch.dtype)
+        if not self.training and key in self._cache:
+            return self._cache[key]
+        pos = bb.pos_patch
+        if g != self.grid:
+            D = pos.shape[-1]
+            pos = F.interpolate(pos.reshape(1, self.grid, self.grid, D).permute(0, 3, 1, 2), size=g, mode="bicubic",
+                                align_corners=False).permute(0, 2, 3, 1).reshape(1, g * g, D)
+        out = (pos, cell_centers(g, device))
+        if not self.training:
+            self._cache[key] = (pos.detach(), out[1])
+        else:
+            self._cache.clear()  # weights move during training
+        return out
 
     def forward(self, img, box, keep_ratio: float, bb: Backbone, sec, img_idx=None):
         """img: (B, 3, S, S); box: (M, 4) normalised xyxy of image img_idx (default: box i on image i)
@@ -142,20 +160,17 @@ class Glimpse(nn.Module):
                 off = self.translator(crop)
                 crop = shift_patches(crop, off)
         with sec("embed"):
-            pos = bb.pos_patch
-            if g != self.grid:
-                D = pos.shape[-1]
-                pos = F.interpolate(pos.reshape(1, self.grid, self.grid, D).permute(0, 3, 1, 2), size=g, mode="bicubic",
-                                    align_corners=False).permute(0, 2, 3, 1).reshape(1, g * g, D)
+            pos, centers = self._grid_terms(bb, g, box.device)
             x = bb.patchify(crop) + pos
             if self.offset_pe is not None:
                 x = x + self.offset_pe(off.flatten(2).transpose(1, 2))
             side = (box[:, 2] - box[:, 0])[:, None, None]
-            xy = box[:, None, :2] + cell_centers(g, box.device)[None] * side
+            xy = box[:, None, :2] + centers[None] * side
             x = x + self.loc_pe(torch.cat([xy, side.expand(-1, xy.shape[1], 1)], -1).to(x.dtype))
             k = max(1, round(keep_ratio * x.shape[1]))
+            aux = x.new_zeros((), dtype=torch.float) if self.training else 0.0  # float at inference: no kernel
+        if self.select != "resize":  # resize keeps every token: the scorer is skipped
             scores = self.scorer(x).squeeze(-1)
-            aux = scores.new_zeros((), dtype=torch.float)
             if self.training and self.distill:  # supervise the scorer with the backbone's own CLS attention
                 aux = F.kl_div(scores.float().log_softmax(-1), cls_attention(bb, x), reduction="batchmean")
             if self.select == "grid":  # fixed, evenly spread subset: coverage instead of importance

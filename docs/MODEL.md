@@ -36,12 +36,15 @@ for t = 1..K:
 return p_t, t
 ```
 
+**Parallel looks** (`model.parallel: true`, B5-par). M2 picks all K fixations from the coarse map before any look: e stays e₀, and inhibition of return is applied between picks. M3 then runs the K crops through the ViT as **one batch** of K·g² tokens in K sequences, and M4 fuses the K outputs in order. This costs 2 ViT passes instead of 1 + K, with no loss of accuracy on CUB (EXPERIMENT_LOG phase 2). Stage B is unchanged, except that the policy context is (g, e₀, q). τ is checked only after the coarse pass.
+
 | Piece | File | Origin |
 |---|---|---|
 | Coarse look with pretrained patch embedding at 448→224 | `models/coarse.py` | Choi 2022, DESIGN fix #3 |
 | Policy over coarse cells × scales; inhibition of return | `models/policy.py` | **ours (addition 1)** |
 | Resize glimpse (whole crop at g×g patches), translate, re-embed | `models/glimpse.py` | FocusViT translation + offset PE. **Resize replaces top-K** (EXPERIMENT_LOG findings 1–3); top-K is kept as A6/B3 |
 | GRU accumulation + entropy stop | `models/aggregator.py` | **ours (addition 2)**, after AdaptiveNN |
+| Parallel looks (F3), CUDA-graph entry points `g_begin` / `g_step` / `g_all` | `models/saccade.py`, `engine/latency.py` | phase 2 (docs/TRADEOFF.md) |
 
 **Cost model** (`engine/evaluate.py: at_tau`), in token-blocks relative to B0:
 
