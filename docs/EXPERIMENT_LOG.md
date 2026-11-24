@@ -245,3 +245,26 @@ Platform: PC48, an RTX 5090 D like PC23, after PC23 dropped offline. Outputs: `o
 - At the top end, B5-par comes within 1.6 points of native-resolution B0 at 2.5× its throughput. Sequential B5 at ρ=1.0, K=3 comes within 0.9 points at 1.4×.
 - At batch 1 ours remains slower than B0 (0.94 ms vs 0.66 ms).
 - Seeds 1–2 and the 768² canvas are running.
+
+## 2026-11-24 night: T4 canvas 512², 3 seeds (PC48)
+
+Test %, mean ± std over seeds 0–2. Throughput is from seed 0 (batch 64, CUDA graphs).
+
+| Model / operating point | Test % | img/s (b64) |
+|---|---|---|
+| B0 native 512 | 59.67 ± 0.58 | 3,980 |
+| B5 ρ=1.0 K=3 | 59.59 ± 0.32 | 5,585 |
+| **B5-par ρ=0.5 K=3** | **59.18 ± 0.51** | **9,850** |
+| B5-par ρ=0.5 K=2 | 56.17 ± 0.32 | 12,617 |
+| B5-par ρ=0.25 K=2 | 52.50 ± 0.34 | 14,312 |
+| B5-par ρ=0.15 K=3 | 47.98 ± 0.31 | 14,950 |
+| **B5 ρ=0.15 K=1** | **39.62 ± 0.53** | **20,748** |
+| B0 224 | 34.56 ± 0.35 | 17,166 |
+| B4 merge | 33.66 ± 0.13 | 19,421 |
+| B2 saliency, 3 looks | 15.25 ± 0.13 | |
+| B1 random, 3 looks | 6.41 ± 0.22 | |
+
+Seeds 1 and 2 confirm seed 0, with differences well beyond the seed spread:
+- B5 ρ=0.15 K=1 beats B0-224 by +5.1 pt and B4 by +6.0 pt, at higher throughput than either.
+- B5-par ρ=0.5 K=3 is within 0.5 pt of native-resolution B0 (inside one std) at 2.5× its throughput.
+- With 3 looks, learned aiming beats saliency by +32.7 pt and random by +41.6 pt.
