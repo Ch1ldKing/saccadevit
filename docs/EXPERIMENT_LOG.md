@@ -171,12 +171,12 @@ K2 still fires: ours is 5.7× slower on GPU and 1.6× slower on CPU, while B4 (t
 
 Plan and claims: [TRADEOFF.md](TRADEOFF.md). All GPU numbers use bf16 autocast and CUDA graphs for every model (`eval.graph=true`). Outputs: `output/<exp>/seed0/latency_cuda_graph*.json`. The generated Pareto table is in [CURRENT_RESULTS.md](CURRENT_RESULTS.md). newpc CPU timings were discarded: the VM's CPUs gave about 1 s per image for B0, so the phase-1 CPU numbers from hitcvsz4 stand.
 
-**New runs (CUB, seed 0)**
+**New runs (CUB, 3 seeds)**
 
 | Run | Test % | Note |
 |---|---|---|
-| B0 native 448 (`b0_448`, 784 tokens) | **84.17** | The resolution ceiling, +7.9 over B0-224 |
-| B5-par (`b5_par`, parallel looks) | 66.38 at ρ=0.15, K=3 (val 67.3) | Same accuracy as sequential B5 (66.44) |
+| B0 native 448 (`b0_448`, 784 tokens) | **84.08 ± 0.22** | The resolution ceiling, +7.8 over B0-224 |
+| B5-par (`b5_par`, parallel looks), ρ=0.15 | 59.3 / 64.7 / 66.4 ± 0.2 at K=1/2/3 | Same accuracy as sequential B5 (58.6 / 64.2 / 66.4) |
 
 **T1: graphs remove the launch overhead, but batch-1 time is still set by kernel count** (ms, batch 1)
 
@@ -190,21 +190,20 @@ Plan and claims: [TRADEOFF.md](TRADEOFF.md). All GPU numbers use bf16 autocast a
 
 At batch 1 a 5090 is nearly idle even for 784 tokens: B0 at 448 costs only +0.13 ms over B0-224. Time follows the number of sequential kernels, so a multi-pass method cannot win in this regime. **The batch-1 GPU claim is dropped for good** (TRADEOFF.md).
 
-**T2/T3: throughput (batch 64) is where token budgets pay off.** Pareto front over (test acc, images/s):
+**T2/T3: throughput (batch 64) is where token budgets pay off.** Pareto front over (test acc, mean of 3 seeds; images/s, seed 0):
 
 | Operating point | Tokens | Test % | img/s | On the front? |
 |---|---|---|---|---|
-| B0 native 448 | 784 | 84.17 | 5,762 | ✓ |
-| **B5-par ρ=1.0 K=2** | 2×196 | 80.32 | 8,233 | ✓ |
-| **B5-par ρ=0.5 K=3** | 3×100 | 79.72 | 10,155 | ✓ |
-| **B5-par ρ=0.5 K=2** | 2×100 | **78.96** | **13,682** | ✓ |
-| **B5-par ρ=0.5 K=1** | 1×100 | 76.37 | 16,666 | ✓ |
+| B0 native 448 | 784 | 84.08 | 5,762 | ✓ |
+| **B5-par ρ=1.0 K=2** | 2×196 | 80.19 | 8,233 | ✓ |
+| **B5-par ρ=0.5 K=3** | 3×100 | 79.99 | 10,155 | ✓ |
+| **B5-par ρ=0.5 K=2** | 2×100 | **79.13** | **13,682** | ✓ |
 | B0 224 | 196 | 76.30 | 19,394 | ✓ |
-| **B5-par ρ=0.25 K=1** | 1×49 | 71.37 | 20,728 | ✓ |
 | B4 merge | 98→49 | 70.96 | 23,772 | ✓ |
-| **B5-par / B5 ρ=0.15 K=1** | 1×25 | 58.6–60.1 | 25,500 | ✓ |
+| **B5-par / B5 ρ=0.15 K=1** | 1×25 | 58.6–59.3 | 25,500 | ✓ |
 
 Reading:
-- Between B0-224 and B0-native, ours is the only option. For example, B5-par at ρ=0.5, K=2 gains +2.7 points over B0-224 at 2.4× the throughput of B0-native. One checkpoint covers the whole front by setting (ρ, K) at test time.
+- Between B0-224 and B0-native, ours is the only option. For example, B5-par at ρ=0.5, K=2 gains +2.8 points over B0-224 at 2.4× the throughput of B0-native. One checkpoint covers the whole front by setting (ρ, K) at test time.
 - Parallel looks are better than sequential at every (ρ, K): +0–2 points of throughput-equivalent accuracy, and 1.3–1.9× faster at batch 1.
-- Ours does **not** beat B0-224 at B0-224's own throughput (76.4% at 16.7k vs 76.3% at 19.4k). The win is the interpolation towards native-resolution accuracy.
+- Ours does **not** beat B0-224 at B0-224's own throughput (76.1% at 16.7k vs 76.3% at 19.4k), nor B4 below it. The win is the interpolation towards native-resolution accuracy.
+- Canvas (small objects) and the 768² canvas (T4, T5) are not run yet. They need CIFAR on newpc (~40 min download) and about 3 h of GPU time.
