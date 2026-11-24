@@ -1,0 +1,12 @@
+# T4: CAIT-style merging on the canvas, fine-tuned from canvas B0.
+_base_: ../b4_merge.yaml
+data:
+  dataset: canvas
+  root: input/datasets/cifar100
+  img_size: 512
+model:
+  num_classes: 100
+  scales: [48, 64, 96, 128]
+train:
+  init: output/canvas-b0_full/seed${seed}/best.pt
+  epochs: 10

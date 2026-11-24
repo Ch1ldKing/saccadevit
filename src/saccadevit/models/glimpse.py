@@ -127,14 +127,16 @@ class Glimpse(nn.Module):
         self.scorer = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, 1))
         self.topk = TopK(sigma, samples)
 
-    def forward(self, img, box, keep_ratio: float, bb: Backbone, sec):
-        """img: (B, 3, S, S); box: (B, 4) normalised xyxy -> (z (B, D), tokens fed to the ViT, scorer aux loss)."""
+    def forward(self, img, box, keep_ratio: float, bb: Backbone, sec, img_idx=None):
+        """img: (B, 3, S, S); box: (M, 4) normalised xyxy of image img_idx (default: box i on image i)
+        -> (z (M, D), tokens fed to the ViT, scorer aux loss)."""
         N = self.grid**2
         # resize: render the crop at g x g patches so *all* its tokens fit the budget (foveal-style zoom)
         g = max(1, round((keep_ratio * N) ** 0.5)) if self.select == "resize" else self.grid
         with sec("crop"):
             S = img.shape[-1]
-            rois = torch.cat([torch.arange(len(box), device=box.device, dtype=box.dtype)[:, None], box * S], 1)
+            idx = torch.arange(len(box), device=box.device) if img_idx is None else img_idx
+            rois = torch.cat([idx[:, None].to(box.dtype), box * S], 1)
             crop = roi_align(img, rois.to(img.dtype), g * (VIT_RES // self.grid), aligned=True, sampling_ratio=2)
             if self.translator is not None:
                 off = self.translator(crop)

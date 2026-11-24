@@ -1,0 +1,5 @@
+# T3 / F3: parallel looks. All K fixations from the coarse map at once; the K crops go through
+# the ViT as one batch; the GRU fuses them in order. Stage B from the same Stage A.
+_base_: b5_ours.yaml
+model:
+  parallel: true

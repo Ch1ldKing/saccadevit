@@ -1,0 +1,5 @@
+# T5: 768^2 canvas with fixed 32-56 px targets (smaller fraction of the image than at 512^2).
+_base_: ../canvas/b0_full.yaml
+data:
+  img_size: 768
+  target_px: [32, 56]

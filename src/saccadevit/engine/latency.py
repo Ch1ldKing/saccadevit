@@ -1,8 +1,11 @@
-"""K2 / H3: does a FLOP saving become a millisecond saving? Batch 1, real early stopping.
+"""K2 / H3 / T1-T3: does a FLOP saving become a millisecond saving?
 
-Two passes: (1) end-to-end timing without inner syncs -> p50 / p95 / peak memory;
-(2) a profiling pass with a sync around each section -> per-module breakdown.
-FLOPs per image come from torch's FlopCounterMode.
+Batch 1 (or eval.latency_batch), real early stopping when tau > 0.
+  * eval.graph=true replays CUDA graphs (F1): the whole forward for full-image models and fixed-K
+    rollouts; one graph for the coarse pass + one per look when tau > 0. Applied to every model alike.
+  * Pass 1: end-to-end timing -> p50 / p95 / peak memory.  Pass 2 (eager only): a sync around each
+    section -> per-module breakdown.  FLOPs per image from FlopCounterMode (eager).
+Output: latency_<device>[_graph][_b<batch>]_rho<rho>_k<K>.json in the run directory.
 """
 
 import json
@@ -15,6 +18,7 @@ import torch
 from torch.utils.flop_counter import FlopCounterMode
 
 from ..data import build_dataset
+from ..models.aggregator import norm_entropy
 from ..models.saccade import SaccadeViT
 from .common import load_for_eval, out_dir
 
@@ -36,53 +40,116 @@ class Timer:
         self.ms[name].append((time.perf_counter() - t0) * 1e3)
 
 
-def _forward(model, img, cfg, timer=None):
-    if isinstance(model, SaccadeViT):
-        return model.infer(img, cfg.eval.tau, keep_ratio=cfg.eval.keep_ratio, timer=timer)[1]
-    model(img)
-    return 0
+def graph(fn, *inputs):
+    """Capture fn(*inputs) as a CUDA graph. Returns run(*new_inputs) -> static outputs."""
+    s = torch.cuda.Stream()
+    s.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(s):
+        for _ in range(3):
+            fn(*inputs)
+    torch.cuda.current_stream().wait_stream(s)
+    g = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(g):
+        out = fn(*inputs)
+
+    def run(*xs):
+        for buf, x in zip(inputs, xs):
+            if buf.data_ptr() != x.data_ptr():
+                buf.copy_(x)
+        g.replay()
+        return out
+
+    return run
+
+
+def make_forward(model, cfg, example, use_graph: bool):
+    """-> f(img) returning looks taken (0 for full-image models)."""
+    tau, rho, k = cfg.eval.tau, cfg.eval.keep_ratio, cfg.model.k_max
+    saccade = isinstance(model, SaccadeViT)
+    batched = len(example) > 1
+    if not use_graph:
+        if not saccade:
+            return lambda img: (model(img), 0)[1]
+        if batched:
+            return lambda img: (model(img, k=k, keep_ratio=rho), k)[1]
+        return lambda img: model.infer(img, tau, keep_ratio=rho)[1]
+    if not saccade:
+        run = graph(model, example.clone())
+        return lambda img: (run(img), 0)[1]
+    if tau == 0 or batched or model.m.parallel:
+        run = graph(lambda x: model.g_all(x, k, rho), example.clone())
+        return lambda img: (run(img), k)[1]
+    begin = graph(model.g_begin, example.clone())
+    C, g, q, e, vis, p0 = begin(example)
+    step = graph(lambda img, C, g, q, e, v: model.g_step(img, C, g, q, e, v, rho), example.clone(), C, g, q, e.clone(), vis.clone())
+
+    def f(img):
+        C, g, q, e, vis, logits = begin(img)
+        for t in range(k):
+            if norm_entropy(logits).item() < tau:
+                return t
+            e, vis, logits = step(img, C, g, q, e, vis)
+        return k
+
+    return f
 
 
 @torch.no_grad()
 def run(cfg) -> dict:
     dev = torch.device(cfg.eval.device if cfg.eval.device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu"))
+    use_graph = bool(cfg.eval.graph) and dev.type == "cuda"
+    bs = cfg.eval.latency_batch
     out = out_dir(cfg)
     model = load_for_eval(cfg, dev)
     if cfg.eval.half:
         model = model.to(torch.bfloat16)
     ds = build_dataset(cfg, "test", *model.backbone.norm_stats)
     dtype = torch.bfloat16 if cfg.eval.half else torch.float32
-    images = [ds[i]["image"][None].to(dev, dtype) for i in range(cfg.eval.latency_images)]
+    n = cfg.eval.latency_images
+    images = [torch.stack([ds[(i * bs + j) % len(ds)]["image"] for j in range(bs)]).to(dev, dtype) for i in range(n)]
+    fwd = make_forward(model, cfg, images[0], use_graph)
 
     for i in range(cfg.eval.warmup):
-        _forward(model, images[i % len(images)], cfg)
+        fwd(images[i % n])
     timer, looks, total = Timer(dev), [], []
     if dev.type == "cuda":
         torch.cuda.reset_peak_memory_stats()
     for i in range(cfg.eval.iters):
-        img = images[i % len(images)]
+        img = images[i % n]
         timer.sync()
         t0 = time.perf_counter()
-        looks.append(_forward(model, img, cfg))
+        looks.append(fwd(img))
         timer.sync()
         total.append((time.perf_counter() - t0) * 1e3)
-    for img in images:
-        _forward(model, img, cfg, timer)
+    sections = {}
+    if not use_graph and bs == 1 and isinstance(model, SaccadeViT):
+        for img in images:
+            model.infer(img, cfg.eval.tau, keep_ratio=cfg.eval.keep_ratio, timer=timer)
+        sections = {k: float(np.sum(v) / n) for k, v in timer.ms.items()}
+    eager = make_forward(model, cfg, images[0], False)
     with FlopCounterMode(display=False) as fc:
         for img in images[:16]:
-            _forward(model, img, cfg)
+            eager(img)
 
+    p50 = float(np.percentile(total, 50))
     res = {
         "device": str(torch.cuda.get_device_name() if dev.type == "cuda" else "cpu"),
-        "p50_ms": float(np.percentile(total, 50)),
+        "graph": use_graph,
+        "batch": bs,
+        "p50_ms": p50,
         "p95_ms": float(np.percentile(total, 95)),
+        "img_per_s": bs * 1e3 / p50,
         "mean_looks": float(np.mean(looks)),
-        "gflops_per_img": fc.get_total_flops() / min(16, len(images)) / 1e9,
+        "gflops_per_img": fc.get_total_flops() / (min(16, n) * bs) / 1e9,
         "peak_mem_mb": torch.cuda.max_memory_allocated() / 2**20 if dev.type == "cuda" else None,
-        "sections_ms_per_img": {k: float(np.sum(v) / len(images)) for k, v in timer.ms.items()},
+        "sections_ms_per_img": sections,
         "tau": cfg.eval.tau,
         "keep_ratio": cfg.eval.keep_ratio,
+        "k_max": cfg.model.k_max if isinstance(model, SaccadeViT) else 0,
     }
-    (out / f"latency_{dev.type}.json").write_text(json.dumps(res, indent=2))
+    tag = f"{dev.type}{'_graph' if use_graph else ''}{f'_b{bs}' if bs > 1 else ''}"
+    if isinstance(model, SaccadeViT):
+        tag += f"_rho{cfg.eval.keep_ratio}_k{cfg.model.k_max}" + (f"_tau{cfg.eval.tau}" if cfg.eval.tau else "")
+    (out / f"latency_{tag}.json").write_text(json.dumps(res, indent=2))
     print(json.dumps(res, indent=2))
     return res

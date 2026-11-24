@@ -25,9 +25,10 @@ def _shuffle_blocks(img: torch.Tensor, block: int, rng) -> torch.Tensor:
 
 
 class Canvas(Dataset):
-    def __init__(self, root, split: str, size: int, mean, std, val_frac: float = 0.1, distractors: int = 8):
+    def __init__(self, root, split: str, size: int, mean, std, val_frac: float = 0.1, distractors: int = 8, target_px=None):
         self.images, self.labels = cifar_split(root, split, val_frac)
-        self.size, self.target_px, self.distractors = size, (size // 16, size * 7 // 64), distractors
+        self.size, self.distractors = size, distractors
+        self.target_px = tuple(target_px) if target_px else (size // 16, size * 7 // 64)  # T5 fixes it in px
         self.train = split == "train"
         self.mean = torch.tensor(mean).view(3, 1, 1)
         self.std = torch.tensor(std).view(3, 1, 1)

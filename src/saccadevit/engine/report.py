@@ -95,9 +95,12 @@ def _latency(runs) -> str:
             r = json.loads(p.read_text())
             sec = ", ".join(f"{k} {v:.2f}" for k, v in r["sections_ms_per_img"].items())
             mem = f"{r['peak_mem_mb']:.0f}" if r["peak_mem_mb"] else "–"
-            rows.append([name, r["device"], r["keep_ratio"], r["tau"], f"{r['p50_ms']:.2f}", f"{r['p95_ms']:.2f}",
-                         f"{r['mean_looks']:.2f}", f"{r['gflops_per_img']:.3f}", mem, sec])
-    return _table(["Experiment", "Device", "ρ", "τ", "p50 ms", "p95 ms", "Looks", "GFLOPs", "Peak MB", "Per-module ms (profiled)"], rows) if rows else "_no latency runs yet_"
+            mode = ("graph" if r.get("graph") else "eager") + (f" b{r['batch']}" if r.get("batch", 1) > 1 else "")
+            rows.append([name, r["device"], mode, r["keep_ratio"], r.get("k_max", "–"), r["tau"], f"{r['p50_ms']:.2f}",
+                         f"{r['p95_ms']:.2f}", f"{r.get('img_per_s', 1e3 / r['p50_ms']):.0f}", f"{r['mean_looks']:.2f}",
+                         f"{r['gflops_per_img']:.3f}", mem, sec])
+    head = ["Experiment", "Device", "Mode", "ρ", "K", "τ", "p50 ms", "p95 ms", "img/s", "Looks", "GFLOPs", "Peak MB", "Per-module ms (eager)"]
+    return _table(head, rows) if rows else "_no latency runs yet_"
 
 
 def _compare() -> str:

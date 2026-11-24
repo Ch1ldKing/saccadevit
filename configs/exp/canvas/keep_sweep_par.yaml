@@ -1,0 +1,5 @@
+# T4: keep-ratio x looks sweep for canvas B5-par.
+_base_: b5_par.yaml
+eval:
+  ckpt: output/canvas-b5_par/seed${seed}/best.pt
+  keep_ratios: [1.0, 0.5, 0.25, 0.15, 0.1]

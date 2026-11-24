@@ -1,0 +1,4 @@
+# T4 / F3: parallel looks on the canvas.
+_base_: b5_ours.yaml
+model:
+  parallel: true

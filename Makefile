@@ -129,3 +129,44 @@ cub_3_seeds: ## CUB matrix for seeds 0 1 2, then latency and H1/H2 comparisons
 	for s in 0 1 2; do $(MAKE) cub SEED=$$s || exit 1; done
 	$(MAKE) latency_all
 	$(MAKE) compare_h1_task_vs_saliency compare_h1_saliency_vs_random compare_h1_task_signal compare_h2_stop
+
+# ---------------------------------------------------------------- phase 2: accuracy-time trade-off (docs/TRADEOFF.md)
+GRID_RHO ?= 0.1 0.15 0.25 0.5 1.0
+GRID_K ?= 1 2 3
+LAT_GRAPH := $(SV) latency
+.PHONY: train_b0_448 train_b5_par sweep_a3_keep_sweep_par evaluate_b0_448 evaluate_b5_par latency_graph_all latency_grid_b5_ours latency_grid_b5_par throughput_all tradeoff_cub
+train_b0_448: ## T2: B0 on the native 448^2 image (784 tokens)
+	$(SV) train $(E)/b0_448.yaml seed=$(SEED) $(ARGS)
+train_b5_par: ## T3: stage B with parallel looks (needs stage_a)
+	$(SV) train $(E)/b5_par.yaml seed=$(SEED) $(ARGS)
+evaluate_b0_448 evaluate_b5_par: evaluate_%:
+	$(SV) eval $(E)/$*.yaml seed=$(SEED) $(ARGS)
+sweep_a3_keep_sweep_par: ## T3: rho x K sweep of B5-par
+	$(SV) sweep $(E)/a3_keep_sweep_par.yaml seed=$(SEED) $(ARGS)
+latency_graph_all: ## T1: batch-1 GPU latency with CUDA graphs, every CUB model (+ eager B0/B5 for reference)
+	for x in b0_full b0_448 b4_merge b3_focusvit b5_ours b5_par; do $(LAT_GRAPH) $(E)/$$x.yaml seed=$(SEED) eval.device=cuda eval.graph=true eval.half=true || exit 1; done
+	for x in b0_full b0_448 b4_merge b5_ours b5_par; do $(LAT_GRAPH) $(E)/$$x.yaml seed=$(SEED) eval.device=cuda eval.half=true || exit 1; done
+latency_grid_b5_ours latency_grid_b5_par: latency_grid_%: ## T2/T3: graph latency over rho x K
+	for r in $(GRID_RHO); do for k in $(GRID_K); do $(LAT_GRAPH) $(E)/$*.yaml seed=$(SEED) eval.device=cuda eval.graph=true eval.half=true eval.keep_ratio=$$r model.k_max=$$k eval.iters=300 || exit 1; done; done
+throughput_all: ## secondary: images/s at batch 64 with graphs
+	for x in b0_full b0_448 b4_merge b5_ours b5_par; do $(LAT_GRAPH) $(E)/$$x.yaml seed=$(SEED) eval.device=cuda eval.graph=true eval.half=true eval.latency_batch=64 eval.latency_images=8 eval.warmup=10 eval.iters=50 || exit 1; done
+tradeoff_cub: ## T1-T3 for SEED: B0-448, B5-par, sweeps, then latency (seed 0 only)
+	$(MAKE) train_b0_448 train_b5_par evaluate_b0_448 evaluate_b5_par sweep_a3_keep_sweep_par SEED=$(SEED)
+
+CANVAS_TRAIN := b0_full b0_native stage_a b4_merge b5_ours b5_par
+CANVAS_EVAL := b0_full b0_native b4_merge b1_random b2_saliency b5_ours b5_par
+.PHONY: canvas_full canvas_3_seeds latency_canvas canvas768
+canvas_full: ## T4: whole canvas matrix for SEED (skips finished runs)
+	for x in $(CANVAS_TRAIN); do $(SV) train $(E)/canvas/$$x.yaml seed=$(SEED) $(ARGS) || exit 1; done
+	for x in $(CANVAS_EVAL); do $(SV) eval $(E)/canvas/$$x.yaml seed=$(SEED) $(ARGS) || exit 1; done
+	$(SV) sweep $(E)/canvas/keep_sweep.yaml seed=$(SEED) $(ARGS)
+	$(SV) sweep $(E)/canvas/keep_sweep_par.yaml seed=$(SEED) $(ARGS)
+canvas_3_seeds: ## T4 for seeds 0 1 2
+	for s in 0 1 2; do $(MAKE) canvas_full SEED=$$s || exit 1; done
+latency_canvas: ## T4: graph latency on the canvas (B0, B0-native, B4, B5 / B5-par grid)
+	for x in b0_full b0_native b4_merge; do $(LAT_GRAPH) $(E)/canvas/$$x.yaml seed=$(SEED) eval.device=cuda eval.graph=true eval.half=true || exit 1; done
+	for x in b5_ours b5_par; do for r in $(GRID_RHO); do for k in $(GRID_K); do $(LAT_GRAPH) $(E)/canvas/$$x.yaml seed=$(SEED) eval.device=cuda eval.graph=true eval.half=true eval.keep_ratio=$$r model.k_max=$$k eval.iters=300 || exit 1; done; done; done
+canvas768: ## T5: 768^2 canvas, fixed 32-56 px targets: B0, B0-native, stage A, B5, sweep
+	for x in b0_full b0_native stage_a b5_ours; do $(SV) train $(E)/canvas768/$$x.yaml seed=$(SEED) $(ARGS) || exit 1; done
+	for x in b0_full b0_native b5_ours; do $(SV) eval $(E)/canvas768/$$x.yaml seed=$(SEED) $(ARGS) || exit 1; done
+	$(SV) sweep $(E)/canvas768/keep_sweep.yaml seed=$(SEED) $(ARGS)

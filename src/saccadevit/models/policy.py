@@ -51,7 +51,10 @@ class LearnedPolicy(nn.Module):
     def forward(self, C, ctx, visited, greedy: bool) -> Action:
         C, ctx = C.detach().float(), ctx.detach().float()
         logits = torch.einsum("bnh,bh->bn", self.key(C), self.query(ctx)).float() / math.sqrt(self.hidden)
-        cells = Categorical(logits=logits.masked_fill(visited, -1e4))
+        logits = logits.masked_fill(visited, -1e4)
+        if greedy and not self.training:  # fast path: no distributions, no host sync (CUDA-graph safe)
+            return Action(logits.argmax(-1), self.scale(ctx).argmax(-1))
+        cells = Categorical(logits=logits)
         scales = Categorical(logits=self.scale(ctx).float())
         if greedy:
             cell, scale = cells.probs.argmax(-1), scales.probs.argmax(-1)

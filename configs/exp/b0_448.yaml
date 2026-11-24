@@ -1,0 +1,4 @@
+# T2: native-resolution ceiling. B0 on the 448^2 image itself (784 tokens), not resized to 224^2.
+_base_: b0_full.yaml
+model:
+  vit_res: 448

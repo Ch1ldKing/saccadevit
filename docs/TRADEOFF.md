@@ -1,0 +1,42 @@
+# Phase 2: the accuracy–time trade-off
+
+Agreed scope (2026-11-24). Success means two things: **beat the baselines on small objects**, and give **a solid accuracy-vs-milliseconds trade-off**. Strict novelty is not required. The results of these experiments are logged in [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md).
+
+## Claims kept and dropped
+
+| Claim | Status | Why |
+|---|---|---|
+| Learned aim beats saliency and random at equal budget | **kept** (proven, +17.7 pt) | |
+| Wins where objects are small | **kept**, main claim | canvas +14 pt over B0 |
+| One checkpoint, budget set at test time | **kept** | |
+| Accuracy vs ms Pareto against B0 / B0-high-res / B4 | **new main claim** | |
+| Looks are *task*-conditioned (`q`) | **dropped** | −0.4 pt, CI includes 0. `q` stays in the code, but no claim is made |
+| Entropy stopping saves compute (H2) | **dropped as a claim** | It saves only 5–25% of looks. τ stays as a knob |
+| ≥1.8× faster than B0-224 at batch 1, eager PyTorch | **dropped** | ViT-Ti at ≤197 tokens is launch-bound, so no token reduction can win there. Replaced by the Pareto claim with CUDA graphs for every model |
+
+## Why the method loses time, and what each fix targets
+
+At batch 1 on GPU, one ViT-Ti pass costs about 4 ms whether it carries 26 tokens or 197. The cost is kernel launches, not arithmetic. B5 makes 1 coarse pass and 3 sequential looks, plus a policy built from many small ops, so it pays that fixed cost about 4 times.
+
+| Fix | What it changes | Expected effect |
+|---|---|---|
+| **F1. CUDA graphs** for every model (B0, B4, ours) | Removes launch overhead; time then follows FLOPs | Ours becomes compute-bound. A fair comparison, since baselines get graphs too |
+| **F2. Greedy fast path** in the policy (no `Categorical`, no sync) | Policy 3.2 ms → ~0 | Needed for F1 (no host syncs inside a graph) |
+| **F3. Parallel looks** (`model.parallel: true`) | Picks all K fixations from the coarse map at once, then runs the K crops as **one batched ViT pass**. The GRU still fuses them in order | 2 passes instead of 1 + K. Trades sequential re-aiming for speed |
+| **F4. Fewer, larger looks** | Choose (ρ, K) on the Pareto front, e.g. 1 look at ρ = 0.5 | Measured, not assumed |
+| **F5. Resolution independence** | Our cost does not grow with input size. B0 at native resolution grows as tokens² | The trade-off wins at high resolution and on small objects |
+
+## Experiments
+
+All latency figures: batch 1 p50 on an RTX 3090, CUDA graphs on (`eval.graph=true`), bf16. Eager numbers are reported too. Throughput at batch 64 (images/s) is a secondary column.
+
+| ID | Question | Runs | Make target |
+|---|---|---|---|
+| **T1** | Do graphs close the gap? | Latency for B0, B4, B3, B5 with graphs on and off | `latency_graph_all` |
+| **T2** | Pareto on CUB | B5 at (ρ, K) ∈ {0.15, 0.25, 0.5, 1.0} × {1, 2, 3}: accuracy from the sweep, ms from the latency grid, against B0-224, **B0-448**, B4 | `train_b0_448`, `latency_grid_b5_ours` |
+| **T3** | Parallel looks | Stage B with `parallel: true` (`b5_par`), 3 seeds; same grid | `train_b5_par`, `latency_grid_b5_par` |
+| **T4** | Small objects, full statistics | Canvas: B0-224, **B0-512 native** (1024 tokens), B4, B1, B2, B5, B5-par, 3 seeds | `canvas_3_seeds` |
+| **T5** | Object size vs resolution | Canvas at 768² with fixed 32–56 px targets (smaller fraction of the image): B0-224, B0-native, B5 | `canvas768` |
+| **T6** | Small-object stratum on real data | CUB test split into object-area terciles: B5 vs B0 vs B4, paired bootstrap, no new training | `compare_small_*` |
+
+**Decision rule.** For each dataset, report the Pareto set over (accuracy, GPU ms). The trade-off is a success if some B5 / B5-par operating point is (a) more accurate than every baseline at no more ms, or (b) faster than every baseline at no lower accuracy.

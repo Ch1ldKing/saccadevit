@@ -13,6 +13,7 @@ data:
 
 model:
   kind: saccade           # full (B0) | merge (B4) | saccade
+  vit_res: 224            # full only: input side of B0 (448 / 512 = native-resolution ceiling)
   backbone: vit_tiny_patch16_224.augreg_in21k_ft_in1k   # ~5.7M params (DESIGN.md fix #1)
   pretrained: true
   weights: input/weights/${model.backbone}/model.safetensors   # fetched by `make setup`
@@ -33,6 +34,7 @@ model:
   select_distill: false   # supervise the token scorer with the backbone's CLS attention (train only)
   fuse_rest: false        # EViT: one extra token = score-weighted mean of the dropped tokens
   k_max: 3
+  parallel: false         # F3: pick all K fixations from the coarse map, one batched ViT pass for the K crops
   merge_at: [4, 7]        # B4 only: merge before blocks 5 and 8
 
 train:
@@ -69,3 +71,5 @@ eval:
   latency_images: 200
   warmup: 50
   iters: 500
+  graph: false            # F1: replay CUDA graphs (applied to every model alike)
+  latency_batch: 1        # >1: throughput mode, fixed K, no early stop

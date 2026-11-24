@@ -8,19 +8,20 @@ import torch.nn.functional as F
 VIT_RES = 224
 
 
-def to_vit_res(img: torch.Tensor) -> torch.Tensor:
-    if img.shape[-1] == VIT_RES:
+def to_vit_res(img: torch.Tensor, res: int = VIT_RES) -> torch.Tensor:
+    if img.shape[-1] == res:
         return img
-    return F.interpolate(img, size=VIT_RES, mode="bilinear", antialias=True, align_corners=False)
+    return F.interpolate(img, size=res, mode="bilinear", antialias=True, align_corners=False)
 
 
 class Backbone(nn.Module):
     """Exposes patchify / encode so callers control which tokens enter the blocks."""
 
-    def __init__(self, name: str, pretrained: bool, num_classes: int, weights: str | None = None):
+    def __init__(self, name: str, pretrained: bool, num_classes: int, weights: str | None = None, img_size: int = VIT_RES):
         super().__init__()
         overlay = {"file": weights} if pretrained else None  # local file from input/weights, no hub access
-        self.vit = timm.create_model(name, pretrained=pretrained, num_classes=num_classes, pretrained_cfg_overlay=overlay)
+        self.vit = timm.create_model(name, pretrained=pretrained, num_classes=num_classes, pretrained_cfg_overlay=overlay,
+                                     img_size=img_size)  # != 224: timm resamples the position embedding
         self.vit.patch_embed.strict_img_size = False  # resize glimpses feed g x g patch grids
         self.dim = self.vit.embed_dim
         self.grid = self.vit.patch_embed.grid_size[0]
@@ -51,11 +52,12 @@ class Backbone(nn.Module):
 
 
 class FullViT(nn.Module):
-    """B0: all 196 tokens of the image resized to 224^2."""
+    """B0: the image resized to vit_res^2 (224 -> 196 tokens; 448 -> 784 tokens for the native-resolution ceiling)."""
 
     def __init__(self, m):
         super().__init__()
-        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights)
+        self.res = m.vit_res
+        self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights, m.vit_res)
 
     def forward(self, img):
-        return self.backbone.vit(to_vit_res(img))
+        return self.backbone.vit(to_vit_res(img, self.res))

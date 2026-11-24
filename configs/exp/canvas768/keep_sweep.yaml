@@ -1,0 +1,4 @@
+_base_: b5_ours.yaml
+eval:
+  ckpt: output/canvas768-b5_ours/seed${seed}/best.pt
+  keep_ratios: [1.0, 0.5, 0.25, 0.15]

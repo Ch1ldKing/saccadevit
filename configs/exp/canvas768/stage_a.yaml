@@ -1,0 +1,6 @@
+_base_: ../canvas/stage_a.yaml
+data:
+  img_size: 768
+  target_px: [32, 56]
+train:
+  init: output/canvas768-b0_full/seed${seed}/best.pt

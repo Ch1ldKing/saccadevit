@@ -1,0 +1,6 @@
+# T5: native-resolution ceiling at 768^2 (2304 tokens).
+_base_: b0_full.yaml
+model:
+  vit_res: 768
+data:
+  batch_size: 16

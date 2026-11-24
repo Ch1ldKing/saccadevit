@@ -9,7 +9,8 @@ DATASETS = {"cub": CUB, "cifar100": CIFAR, "canvas": Canvas}
 
 def build_dataset(cfg, split: str, mean, std):
     d = cfg.data
-    return DATASETS[d.dataset](d.root, split, d.img_size, mean, std, val_frac=d.val_frac)
+    extra = {"target_px": d.target_px} if d.get("target_px") else {}
+    return DATASETS[d.dataset](d.root, split, d.img_size, mean, std, val_frac=d.val_frac, **extra)
 
 
 def build_loader(cfg, split: str, mean, std, batch_size: int | None = None):
