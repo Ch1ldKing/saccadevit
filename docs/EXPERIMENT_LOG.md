@@ -207,3 +207,18 @@ Reading:
 - Parallel looks are better than sequential at every (ρ, K): +0–2 points of throughput-equivalent accuracy, and 1.3–1.9× faster at batch 1.
 - Ours does **not** beat B0-224 at B0-224's own throughput (76.1% at 16.7k vs 76.3% at 19.4k), nor B4 below it. The win is the interpolation towards native-resolution accuracy.
 - Canvas (small objects) and the 768² canvas (T4, T5) are not run yet. They need CIFAR on newpc (~40 min download) and about 3 h of GPU time.
+
+**T6: small objects on real data (CUB, test split into object-area terciles, paired bootstrap, seed 0).** Output: `output/compare/t6_*.json`.
+
+| Comparison (Δ = ours − baseline) | All | Small third | Medium | Large |
+|---|---|---|---|---|
+| B5 ρ=0.15 K=3 vs B0-224 (3 seeds) | −9.9 [−10.6, −9.1] | −10.1 | −9.3 | −10.2 |
+| **B5-par ρ=0.5 K=2 vs B0-224** | **+2.9** [2.0, 3.9] | **+8.3** [6.5, 10.1] | +2.5 | −2.1 |
+| B5-par ρ=0.5 K=2 vs B0-native 448 | −5.2 | −4.6 | −4.1 | −7.0 |
+
+At the trade-off operating point, the whole gain over B0-224 comes from small and medium birds; large birds lose a little. The default budget (ρ=0.15) is too small to show any size effect.
+
+**2026-11-24 afternoon, canvas speed-up for newpc.**
+- Canvas images now travel as uint8 and are normalised on the GPU (`Backbone.prep`).
+- The bicubic background is computed as two exact matrix products (max error 6e-7).
+- Result: 3.5× faster generation, and 4× less data per sample. Test canvases are unchanged.
