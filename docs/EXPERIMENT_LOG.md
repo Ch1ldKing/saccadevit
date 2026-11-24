@@ -222,3 +222,26 @@ At the trade-off operating point, the whole gain over B0-224 comes from small an
 - Canvas images now travel as uint8 and are normalised on the GPU (`Backbone.prep`).
 - The bicubic background is computed as two exact matrix products (max error 6e-7).
 - Result: 3.5× faster generation, and 4× less data per sample. Test canvases are unchanged.
+
+## 2026-11-24 evening: T4 canvas 512² on PC48 (user2), seed 0
+
+Platform: PC48, an RTX 5090 D like PC23, after PC23 dropped offline. Outputs: `output/canvas-*/seed0/`. Accuracy is on the test split; throughput is batch 64 with CUDA graphs.
+
+| Model / operating point | Tokens | Test % | img/s (b64) | GPU ms (b1) |
+|---|---|---|---|---|
+| B0 native 512 (`canvas/b0_native`) | 1024 | 60.37 | 3,980 | 0.82 |
+| B5 ρ=1.0 K=3 | 3×196 | 59.50 | 5,585 | 2.48 |
+| **B5-par ρ=0.5 K=3** | 3×100 | **58.72** | **9,850** | 1.21 |
+| B5-par ρ=0.5 K=2 | 2×100 | 55.87 | 12,617 | 1.12 |
+| B5-par ρ=0.15 K=3 | 3×25 | 48.32 | 14,950 | 1.18 |
+| **B5 ρ=0.15 K=1** | 1×25 | **40.10** | **20,748** | 0.94 |
+| B0 224 | 196 | 34.45 | 17,166 | 0.66 |
+| B4 merge | 98→49 | 33.54 | 19,421 | 0.64 |
+| B2 saliency looks, 3 looks | 3×25 | 15.42 | | |
+| B1 random looks, 3 looks | 3×25 | 6.64 | | |
+
+**The small-object goal is met on throughput.**
+- Our cheapest point (1 look, 25 tokens) beats both B0-224 (+5.7 pt) and B4 (+6.6 pt) **at higher throughput** than either.
+- At the top end, B5-par comes within 1.6 points of native-resolution B0 at 2.5× its throughput. Sequential B5 at ρ=1.0, K=3 comes within 0.9 points at 1.4×.
+- At batch 1 ours remains slower than B0 (0.94 ms vs 0.66 ms).
+- Seeds 1–2 and the 768² canvas are running.
