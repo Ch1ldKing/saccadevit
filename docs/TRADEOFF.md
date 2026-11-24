@@ -9,7 +9,7 @@ Agreed scope (2026-11-24). Success means two things: **beat the baselines on sma
 | Learned aim beats saliency and random at equal budget | **kept** (proven, +17.7 pt) | |
 | Wins where objects are small | **kept**, main claim | canvas +14 pt over B0 |
 | One checkpoint, budget set at test time | **kept** | |
-| Accuracy vs ms Pareto against B0 / B0-high-res / B4 | **new main claim** | |
+| Accuracy vs ms Pareto against B0 / B0-high-res / B4 | **new main claim**, measured as **throughput** (batch 64) | At batch 1 the 5090 is idle even at 784 tokens (B0-448 0.85 ms vs B0-224 0.72 ms), so time follows kernel count and no multi-pass method can win there. On the throughput front, B5-par holds every point between B0-224 and B0-native (EXPERIMENT_LOG, 2026-11-24) |
 | Looks are *task*-conditioned (`q`) | **dropped** | −0.4 pt, CI includes 0. `q` stays in the code, but no claim is made |
 | Entropy stopping saves compute (H2) | **dropped as a claim** | It saves only 5–25% of looks. τ stays as a knob |
 | ≥1.8× faster than B0-224 at batch 1, eager PyTorch | **dropped** | ViT-Ti at ≤197 tokens is launch-bound, so no token reduction can win there. Replaced by the Pareto claim with CUDA graphs for every model |
