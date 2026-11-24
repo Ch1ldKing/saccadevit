@@ -141,6 +141,7 @@ class SaccadeViT(nn.Module):
         k = self.m.k_max if k is None else k
         keep_ratio = self.m.keep_ratio if keep_ratio is None else keep_ratio
         policy = policy or self.m.policy
+        img = self.backbone.prep(img)
         st = self.begin(img)
         logits, tokens = [st.p0], []
         if self.m.parallel and k > 0:
@@ -169,6 +170,7 @@ class SaccadeViT(nn.Module):
         k = self.m.k_max if k is None else k
         keep_ratio = self.m.keep_ratio if keep_ratio is None else keep_ratio
         policy = policy or self.m.policy
+        img = self.backbone.prep(img)
         with sec("coarse"):
             st = self.begin(img)
         logits = st.p0
@@ -188,11 +190,12 @@ class SaccadeViT(nn.Module):
 
     # -- CUDA-graph pieces (F1): tensors in, tensors out, no host sync ------------------
     def g_begin(self, img):
-        st = self.begin(img)
+        st = self.begin(self.backbone.prep(img))
         return st.C, st.g, st.q, st.e, st.visited, st.p0.float()
 
     def g_step(self, img, C, g, q, e, visited, keep_ratio: float):
         st = State(C, g, q, e, None, visited)
+        img = self.backbone.prep(img)
         logits, _ = self.look(st, img, self.act(st, 0, self.m.policy, True, img), keep_ratio)
         return st.e, st.visited, logits.float()
 

@@ -24,14 +24,20 @@ def _shuffle_blocks(img: torch.Tensor, block: int, rng) -> torch.Tensor:
     return tiles.reshape(c, n, n, block, block).permute(0, 1, 3, 2, 4).reshape(c, h, w)
 
 
+def _bicubic_matrix(n: int, size: int) -> torch.Tensor:
+    """(size, n) matrix A with A @ X @ A.T == bicubic upsampling of X (separable), ~20x cheaper per sample."""
+    basis = torch.eye(n)[:, :, None].expand(n, n, n).contiguous()  # basis[j] = e_j (rows) x ones (cols)
+    up = F.interpolate(basis[:, None], size=size, mode="bicubic", align_corners=False)  # (n, 1, size, size)
+    return up[:, 0, :, 0].T.contiguous()
+
+
 class Canvas(Dataset):
     def __init__(self, root, split: str, size: int, mean, std, val_frac: float = 0.1, distractors: int = 8, target_px=None):
         self.images, self.labels = cifar_split(root, split, val_frac)
         self.size, self.distractors = size, distractors
         self.target_px = tuple(target_px) if target_px else (size // 16, size * 7 // 64)  # T5 fixes it in px
         self.train = split == "train"
-        self.mean = torch.tensor(mean).view(3, 1, 1)
-        self.std = torch.tensor(std).view(3, 1, 1)
+        self._up = None  # bicubic as two matmuls, built lazily per worker
 
     def __len__(self):
         return len(self.labels)
@@ -44,7 +50,9 @@ class Canvas(Dataset):
         rng = np.random.default_rng(None if self.train else i)
         S = self.size
         noise = torch.from_numpy(rng.random((3, 8, 8))).float()
-        canvas = F.interpolate(noise[None], size=S, mode="bicubic", align_corners=False)[0].clamp(0, 1) * 0.6 + 0.2
+        if self._up is None:
+            self._up = _bicubic_matrix(8, S)
+        canvas = (self._up @ noise @ self._up.T).clamp(0, 1) * 0.6 + 0.2
         for _ in range(self.distractors):
             px = int(rng.integers(*self.target_px)) // 8 * 8
             j = int(rng.integers(len(self.labels)))
@@ -57,4 +65,5 @@ class Canvas(Dataset):
         if self.train and rng.random() < 0.5:
             canvas, x = canvas.flip(2), S - x - px
         box = torch.tensor([x, y, x + px, y + px], dtype=torch.float) / S
-        return {"image": (canvas - self.mean) / self.std, "label": int(self.labels[i]), "box": box, "parts": NO_PARTS}
+        image = canvas.mul(255).round_().clamp_(0, 255).to(torch.uint8)  # normalised on device (Backbone.prep)
+        return {"image": image, "label": int(self.labels[i]), "box": box, "parts": NO_PARTS}

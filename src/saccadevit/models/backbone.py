@@ -27,6 +27,15 @@ class Backbone(nn.Module):
         self.grid = self.vit.patch_embed.grid_size[0]
         self.num_patches = self.grid**2
         self.depth = len(self.vit.blocks)
+        mean, std = self.norm_stats
+        self.register_buffer("mean", torch.tensor(mean).view(1, 3, 1, 1) * 255, persistent=False)
+        self.register_buffer("std", torch.tensor(std).view(1, 3, 1, 1) * 255, persistent=False)
+
+    def prep(self, img: torch.Tensor) -> torch.Tensor:
+        """uint8 images (the canvas ships uint8 to keep data loading cheap) are normalised here, on device."""
+        if img.dtype != torch.uint8:
+            return img
+        return (img.float() - self.mean) / self.std
 
     @property
     def norm_stats(self):
@@ -60,4 +69,4 @@ class FullViT(nn.Module):
         self.backbone = Backbone(m.backbone, m.pretrained, m.num_classes, m.weights, m.vit_res)
 
     def forward(self, img):
-        return self.backbone.vit(to_vit_res(img, self.res))
+        return self.backbone.vit(to_vit_res(self.backbone.prep(img), self.res))

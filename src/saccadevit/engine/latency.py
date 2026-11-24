@@ -125,7 +125,8 @@ def run(cfg) -> dict:
     ds = build_dataset(cfg, "test", *model.backbone.norm_stats)
     dtype = torch.float32
     n = cfg.eval.latency_images
-    images = [torch.stack([ds[(i * bs + j) % len(ds)]["image"] for j in range(bs)]).to(dev, dtype) for i in range(n)]
+    images = [torch.stack([ds[(i * bs + j) % len(ds)]["image"] for j in range(bs)]).to(dev) for i in range(n)]
+    images = [x if x.dtype == torch.uint8 else x.to(dtype) for x in images]
     fwd = make_forward(model, cfg, images[0], use_graph)
 
     for i in range(cfg.eval.warmup):

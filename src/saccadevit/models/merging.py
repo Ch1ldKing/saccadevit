@@ -43,6 +43,7 @@ class MergeViT(nn.Module):
 
     def forward(self, img):
         bb = self.backbone
+        img = bb.prep(img)
         h = bb.encode(bb.patchify(to_vit_res(img)) + bb.pos_patch, 0, 0)
         hw = (bb.grid, bb.grid)
         for i, blk in enumerate(bb.vit.blocks):
