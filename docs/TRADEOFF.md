@@ -47,12 +47,12 @@ Both success conditions hold. Numbers are 3 seeds unless marked; details in [EXP
 
 | Goal | Evidence | Met |
 |---|---|---|
-| Beat the baselines on small objects | Canvas 512²: one 25-token look gives 39.6 ± 0.5% vs B0-224 34.6 ± 0.4% and B4 33.7 ± 0.1%, at higher throughput than both. Canvas 768² (seed 0): +5.7 pt over B0-224, again faster. CUB T6: +7.9 pt [6.7, 9.2] over B0-224 on the smallest third of birds | ✓ |
-| Solid accuracy-vs-time trade-off (decision rule, throughput) | (a) CUB: B5-par holds every Pareto point between B0-224 and B0-448. (b) Canvas 512²: B5-par ρ=0.5 K=3 is within 0.5 pt of native B0 at 2.5× its throughput, and B5 ρ=0.15 K=1 is faster *and* more accurate than B0-224 and B4. (c) Canvas 768²: 6.2× native B0's throughput at −6.2 pt | ✓ |
+| Beat the baselines on small objects | Canvas 512²: one 25-token look gives 39.6 ± 0.5% vs B0-224 34.6 ± 0.4% and B4 33.7 ± 0.1%, at higher throughput than both. Canvas 768² (3 seeds): 31.6 ± 1.0% vs B0-224 24.9 ± 0.1% (+6.7 pt), again faster. CUB T6: +7.9 pt [6.7, 9.2] over B0-224 on the smallest third of birds | ✓ |
+| Solid accuracy-vs-time trade-off (decision rule, throughput) | (a) CUB: B5-par holds every Pareto point between B0-224 and B0-448. (b) Canvas 512²: B5-par ρ=0.5 K=3 is within 0.5 pt of native B0 at 2.5× its throughput, and B5 ρ=0.15 K=1 is faster *and* more accurate than B0-224 and B4. (c) Canvas 768² (3 seeds): 6.2× native B0's throughput at −5.7 pt | ✓ |
 | Batch-1 milliseconds | Not a claim (dropped). It still holds at 768²: 1 look beats B0-native on ms and B0-224 on accuracy | partial |
 
 Limits to state in the write-up:
 - Ours never beats B0-224 on CUB at B0-224's own throughput. The CUB win is the interpolation towards native-resolution accuracy.
 - Large CUB birds lose 2.3 pt.
-- Canvas 768² is a single seed.
+- At 768² only B0-224, B0-native and B5 were trained (no B5-par, no B4).
 - The canvas 512² checkpoints for B5-par seeds 1–2 were lost with PC48. Their results are kept.

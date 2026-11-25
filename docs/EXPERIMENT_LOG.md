@@ -290,3 +290,23 @@ PC48 went offline, so this ran on a rented RTX 4090. Its speeds are comparable o
 - B0 at native resolution costs much more now: 2,304 tokens, 979 img/s. Ours at ρ=0.5 K=3 runs at **6.2× its throughput** and gives up 6.2 pt. At 512² the cost was 0.5 pt for 2.5×. So the gap to native B0 widens with resolution, at a much larger speed-up.
 - At **batch 1**, ours is now on the time front too. ρ=1.0 K=1 (1.05 ms, 40.5%) and ρ=0.5 K=1 (0.90 ms, 39.6%) are faster than B0-native's 1.34 ms. They are also 15 pt more accurate than B0-224. This is F5: our cost does not grow with the input size, while B0's does.
 - Seed 0 only. B5-par and B4 were not trained at 768².
+
+## 2026-11-25 evening: T5 canvas 768², 3 seeds (RTX 4090)
+
+Test %, mean ± std over seeds 0–2. Throughput and ms are from seed 0 (speed does not depend on the seed).
+
+| Model / operating point | Test % | img/s (b64) | GPU ms (b1) |
+|---|---|---|---|
+| B0 native 768 | 57.44 ± 0.14 | 979 | 1.34 |
+| B5 ρ=1.0 K=3 | 52.50 ± 0.20 | 4,153 | 2.32 |
+| **B5 ρ=0.5 K=3** | **51.77 ± 0.40** | **6,103** | 2.10 |
+| B5 ρ=0.5 K=2 | 48.10 ± 0.51 | 7,581 | 1.52 |
+| B5 ρ=1.0 K=1 | 41.07 ± 0.54 | 7,976 | 1.05 |
+| B5 ρ=0.5 K=1 | 40.42 ± 0.69 | 10,019 | 0.90 |
+| **B5 ρ=0.15 K=1** | **31.61 ± 1.04** | **11,671** | 0.92 |
+| B0 224 | 24.91 ± 0.06 | 9,863 | 0.62 |
+
+Seeds 1 and 2 confirm seed 0:
+- One 25-token look beats B0-224 by +6.7 pt, at 1.18× its throughput.
+- Ours at ρ=0.5 K=3 runs at 6.2× native B0's throughput, for −5.7 pt.
+- At batch 1, one look (0.90–1.05 ms) is faster than B0-native (1.34 ms) and 15–16 pt more accurate than B0-224.
