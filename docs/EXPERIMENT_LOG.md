@@ -215,6 +215,7 @@ Reading:
 | B5 ρ=0.15 K=3 vs B0-224 (3 seeds) | −9.9 [−10.6, −9.1] | −10.1 | −9.3 | −10.2 |
 | **B5-par ρ=0.5 K=2 vs B0-224** | **+2.9** [2.0, 3.9] | **+8.3** [6.5, 10.1] | +2.5 | −2.1 |
 | B5-par ρ=0.5 K=2 vs B0-native 448 | −5.2 | −4.6 | −4.1 | −7.0 |
+| **B5-par ρ=0.5 K=2 vs B0-224, 3 seeds pooled** (2026-11-25) | **+2.8** [2.2, 3.4] | **+7.9** [6.7, 9.2] | +2.7 [1.7, 3.7] | −2.3 [−3.3, −1.3] |
 
 At the trade-off operating point, the whole gain over B0-224 comes from small and medium birds; large birds lose a little. The default budget (ρ=0.15) is too small to show any size effect.
 
