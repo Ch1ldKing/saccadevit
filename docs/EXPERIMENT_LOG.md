@@ -269,3 +269,24 @@ Seeds 1 and 2 confirm seed 0, with differences well beyond the seed spread:
 - B5 ρ=0.15 K=1 beats B0-224 by +5.1 pt and B4 by +6.0 pt, at higher throughput than either.
 - B5-par ρ=0.5 K=3 is within 0.5 pt of native-resolution B0 (inside one std) at 2.5× its throughput.
 - With 3 looks, learned aiming beats saliency by +32.7 pt and random by +41.6 pt.
+
+## 2026-11-25: T5 canvas 768², seed 0 (new RTX 4090 machine)
+
+PC48 went offline, so this ran on a rented RTX 4090. Its speeds are comparable only with each other, not with the 512² table from the 5090. The targets are still 32–56 px, so each object is a smaller fraction of the image. Outputs: `output/canvas768-*/seed0/`.
+
+| Model / operating point | Tokens | Test % | img/s (b64) | GPU ms (b1) |
+|---|---|---|---|---|
+| B0 native 768 | 2304 | 57.55 | 979 | 1.34 |
+| B5 ρ=1.0 K=3 | 3×196 | 52.54 | 4,153 | 2.32 |
+| **B5 ρ=0.5 K=3** | 3×100 | **51.36** | **6,103** | 2.10 |
+| B5 ρ=0.5 K=2 | 2×100 | 47.57 | 7,581 | 1.52 |
+| B5 ρ=1.0 K=1 | 1×196 | 40.45 | 7,976 | **1.05** |
+| B5 ρ=0.5 K=1 | 1×100 | 39.63 | 10,019 | 0.90 |
+| **B5 ρ=0.15 K=1** | 1×25 | **30.56** | **11,671** | 0.92 |
+| B0 224 | 196 | 24.90 | 9,863 | 0.62 |
+
+**What changes from 512² to 768²:**
+- The win at the cheap end is the same. One 25-token look beats B0-224 by +5.7 pt at 1.18× its throughput.
+- B0 at native resolution costs much more now: 2,304 tokens, 979 img/s. Ours at ρ=0.5 K=3 runs at **6.2× its throughput** and gives up 6.2 pt. At 512² the cost was 0.5 pt for 2.5×. So the gap to native B0 widens with resolution, at a much larger speed-up.
+- At **batch 1**, ours is now on the time front too. ρ=1.0 K=1 (1.05 ms, 40.5%) and ρ=0.5 K=1 (0.90 ms, 39.6%) are faster than B0-native's 1.34 ms. They are also 15 pt more accurate than B0-224. This is F5: our cost does not grow with the input size, while B0's does.
+- Seed 0 only. B5-par and B4 were not trained at 768².

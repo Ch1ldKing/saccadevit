@@ -28,7 +28,7 @@ At batch 1 on GPU, one ViT-Ti pass costs about 4 ms whether it carries 26 tokens
 
 ## Experiments
 
-All latency figures: batch 1 p50 on an RTX 3090, CUDA graphs on (`eval.graph=true`), bf16. Eager numbers are reported too. Throughput at batch 64 (images/s) is a secondary column.
+All latency figures: batch 1 p50 on the RTX 5090 D (CUB, canvas 512²) or a rented RTX 4090 (canvas 768²), CUDA graphs on (`eval.graph=true`), bf16. Eager numbers are reported too. Throughput at batch 64 (images/s) is a secondary column.
 
 | ID | Question | Runs | Make target |
 |---|---|---|---|
@@ -40,3 +40,19 @@ All latency figures: batch 1 p50 on an RTX 3090, CUDA graphs on (`eval.graph=tru
 | **T6** | Small-object stratum on real data | CUB test split into object-area terciles: B5 vs B0 vs B4, paired bootstrap, no new training | `compare_small_*` |
 
 **Decision rule.** For each dataset, report the Pareto set over (accuracy, GPU ms). The trade-off is a success if some B5 / B5-par operating point is (a) more accurate than every baseline at no more ms, or (b) faster than every baseline at no lower accuracy.
+
+## Verdict (2026-11-25)
+
+Both success conditions hold. Numbers are 3 seeds unless marked; details in [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md).
+
+| Goal | Evidence | Met |
+|---|---|---|
+| Beat the baselines on small objects | Canvas 512²: one 25-token look gives 39.6 ± 0.5% vs B0-224 34.6 ± 0.4% and B4 33.7 ± 0.1%, at higher throughput than both. Canvas 768² (seed 0): +5.7 pt over B0-224, again faster. CUB T6: +7.9 pt [6.7, 9.2] over B0-224 on the smallest third of birds | ✓ |
+| Solid accuracy-vs-time trade-off (decision rule, throughput) | (a) CUB: B5-par holds every Pareto point between B0-224 and B0-448. (b) Canvas 512²: B5-par ρ=0.5 K=3 is within 0.5 pt of native B0 at 2.5× its throughput, and B5 ρ=0.15 K=1 is faster *and* more accurate than B0-224 and B4. (c) Canvas 768²: 6.2× native B0's throughput at −6.2 pt | ✓ |
+| Batch-1 milliseconds | Not a claim (dropped). It still holds at 768²: 1 look beats B0-native on ms and B0-224 on accuracy | partial |
+
+Limits to state in the write-up:
+- Ours never beats B0-224 on CUB at B0-224's own throughput. The CUB win is the interpolation towards native-resolution accuracy.
+- Large CUB birds lose 2.3 pt.
+- Canvas 768² is a single seed.
+- The canvas 512² checkpoints for B5-par seeds 1–2 were lost with PC48. Their results are kept.
