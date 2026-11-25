@@ -36,6 +36,54 @@ for t = 1..K:
 return p_t, t
 ```
 
+**Architecture.** One shared ViT-Tiny/16. Call A is the coarse pass (patch embed, learned position embedding, blocks 1–2). Call B is each glimpse (same patch embed, position embedding resampled to g×g, blocks 1–12 and the final LayerNorm, CLS only). Sequential inference is 1+K ViT forwards; `model.parallel: true` batches the K glimpses into one call B, so two forwards in total. The policy, translator, offset/location MLPs, GRU and both linear heads are not ViT layers.
+
+```mermaid
+flowchart TB
+  X["input x<br/>CUB 448² · Canvas 512²"]
+
+  subgraph M1["M1 coarse"]
+    R["resize to 224²"]
+    V1["ViT call A<br/>patch embed + learned pos embed + CLS<br/>blocks 1–2 only"]
+    C["C: drop CLS, 14×14×192"]
+    G["g = LayerNorm mean C"]
+    P0["p0 = Linear g"]
+  end
+
+  Q["q = Linear softmax p0<br/>stop-gradient on p0"]
+  E0["e0 = tanh Linear g"]
+
+  subgraph M2["M2 aim"]
+    POL["query = MLP of g, e, q<br/>key = Linear C<br/>dot-product over the 14×14 cells<br/>second MLP picks scale 80/112/160/224"]
+  end
+
+  subgraph M3["M3 look"]
+    ROI["roi_align crop<br/>ρ=0.15 → 80² = 5×5 patches"]
+    TR["stride-16 conv predicts per-patch dx, dy"]
+    EMB["same patch embed<br/>pos embed bicubic-resampled to 5×5<br/>+ MLP dx,dy + MLP full-image xy, side"]
+    V2["ViT call B<br/>prepend CLS<br/>blocks 1–12 + final LayerNorm<br/>CLS → z"]
+  end
+
+  subgraph M4["M4 accumulate"]
+    GRU["e = GRUCell z, e"]
+    PT["p = Linear LayerNorm e"]
+  end
+
+  X --> R --> V1 --> C --> G --> P0
+  G --> E0
+  P0 --> Q
+  C --> POL
+  G --> POL
+  E0 --> POL
+  Q --> POL
+  POL --> ROI --> TR --> EMB --> V2 --> GRU --> PT
+  E0 --> GRU
+  GRU -.->|sequential: updated e returns to the policy| POL
+  PT -.->|stop when normalised entropy &lt; τ| STOP["output p"]
+```
+
+**Position encodings** (`models/backbone.py`, `models/glimpse.py`). The ViT carries its pretrained learned absolute `pos_embed` of shape `(1, 1+196, 192)`, the standard augreg table of one vector per token. `Backbone.encode` adds `pos_embed[:, :1]` to the class token. Patch tokens use `pos_embed[:, -196:]`, laid out as 14×14. The coarse pass adds that grid unchanged. A glimpse on a g×g grid bicubic-interpolates the 14×14 embedding (`align_corners=false`) and adds it in crop coordinates, so those channels say where a token sits inside the crop, not in the original image. Two zero-initialised MLPs are added only on glimpse tokens: `offset_pe` is `MLP(2 → 64 → 192)` on the translator shift `(dx, dy)` in patch units (`model.offset_pe`; A1 sets it false); `loc_pe` is `MLP(3 → 64 → 192)` on `(x, y, side)`, where `(x, y)` is the patch centre in normalised full-image coordinates and `side` is the normalised crop side. The sum is the `u_i` line above.
+
 **Parallel looks** (`model.parallel: true`, B5-par). M2 picks all K fixations from the coarse map before any look: e stays e₀, and inhibition of return is applied between picks. M3 then runs the K crops through the ViT as **one batch** of K·g² tokens in K sequences, and M4 fuses the K outputs in order. This costs 2 ViT passes instead of 1 + K, with no loss of accuracy on CUB (EXPERIMENT_LOG phase 2). Stage B is unchanged, except that the policy context is (g, e₀, q). τ is checked only after the coarse pass.
 
 | Piece | File | Origin |
